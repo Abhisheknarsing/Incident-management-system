@@ -1,0 +1,20 @@
+# Backend (Go)
+backend/bin/
+backend/uploads/*
+!backend/uploads/.gitkeep
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# Frontend (Node.js)
+frontend/node_modules/
+frontend/dist/
+
+.idea/
+.vscode/
+.kiro/
