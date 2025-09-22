@@ -72,12 +72,18 @@ export const apiClient = {
     list: (): Promise<Upload[]> => 
       api.get('/uploads').then(res => res.data),
     
-    upload: (file: File): Promise<Upload> => {
+    upload: (file: File, onProgress?: (progress: number) => void): Promise<Upload> => {
       const formData = new FormData()
       formData.append('file', file)
       return api.post('/uploads', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress: (progressEvent) => {
+          if (onProgress && progressEvent.total) {
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+            onProgress(progress)
+          }
         },
       }).then(res => res.data)
     },

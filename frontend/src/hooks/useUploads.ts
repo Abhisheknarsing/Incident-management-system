@@ -16,11 +16,11 @@ export function useUploads() {
   })
 }
 
-export function useUploadFile() {
+export function useUploadFile(onProgress?: (progress: number) => void) {
   const queryClient = useQueryClient()
   
   return useMutation({
-    mutationFn: apiClient.uploads.upload,
+    mutationFn: (file: File) => apiClient.uploads.upload(file, onProgress),
     onSuccess: (newUpload: Upload) => {
       // Update the uploads list with the new upload
       queryClient.setQueryData(QUERY_KEYS.uploads, (old: Upload[] = []) => [
@@ -35,7 +35,7 @@ export function useUploadFile() {
 }
 
 export function useUploadStatus(uploadId: string, enabled = true) {
-  return useQuery({
+  return useQuery<ProcessingStatus>({
     queryKey: QUERY_KEYS.uploadStatus(uploadId),
     queryFn: () => apiClient.uploads.getStatus(uploadId),
     enabled: enabled && !!uploadId,
