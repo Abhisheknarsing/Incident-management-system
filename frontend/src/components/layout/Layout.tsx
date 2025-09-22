@@ -1,5 +1,6 @@
 import { ReactNode } from 'react'
 import { Navigation } from './Navigation'
+import { NotificationContainer } from '@/components/ui/notifications'
 
 interface LayoutProps {
   children: ReactNode
@@ -12,6 +13,7 @@ export function Layout({ children }: LayoutProps) {
       <main className="container mx-auto px-4 py-8">
         {children}
       </main>
+      <NotificationContainer />
     </div>
   )
 }

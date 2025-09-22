@@ -110,3 +110,25 @@ export interface ExportOptions {
   dataType: string
   includeFilters: boolean
 }
+
+export interface ExportJob {
+  id: string
+  format: 'csv' | 'pdf'
+  data_type: string
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  progress: number
+  download_url?: string
+  created_at: string
+}
+
+export interface DateRangeFilter {
+  start_date: string
+  end_date: string
+}
+
+export interface FilterCriteria {
+  date_range?: DateRangeFilter
+  priorities?: string[]
+  applications?: string[]
+  statuses?: string[]
+}

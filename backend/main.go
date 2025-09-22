@@ -32,6 +32,7 @@ func main() {
 
 	// Initialize handlers
 	uploadHandler := handlers.NewUploadHandler(db.GetConnection(), fileStore, processingService)
+	analyticsHandler := handlers.NewAnalyticsHandler(db.GetConnection())
 
 	// Initialize Gin router
 	r := gin.Default()
@@ -60,6 +61,34 @@ func main() {
 		api.GET("/uploads/:id", uploadHandler.GetUpload)
 		api.POST("/uploads/:id/process", uploadHandler.ProcessUpload)
 		api.GET("/uploads/:id/status", uploadHandler.GetProcessingStatus)
+
+		// Analytics endpoints
+		analytics := api.Group("/analytics")
+		{
+			// Timeline endpoints
+			analytics.GET("/timeline/daily", analyticsHandler.GetDailyTimeline)
+			analytics.GET("/timeline/weekly", analyticsHandler.GetWeeklyTimeline)
+			analytics.GET("/timeline/overview", analyticsHandler.GetTimelineOverview)
+			
+			// Trend analysis endpoints
+			analytics.GET("/trends", analyticsHandler.GetTrendAnalysis)
+			
+			// Metrics endpoints
+			analytics.GET("/metrics/daily", analyticsHandler.GetTicketsPerDayMetrics)
+			analytics.GET("/metrics/weekly", analyticsHandler.GetTicketsPerWeekMetrics)
+			
+			// Priority and Application Analysis endpoints
+			analytics.GET("/priority", analyticsHandler.GetPriorityAnalysis)
+			analytics.GET("/applications", analyticsHandler.GetApplicationAnalysis)
+			analytics.GET("/resolution", analyticsHandler.GetResolutionAnalysis)
+			analytics.GET("/performance", analyticsHandler.GetPerformanceMetrics)
+			
+			// Sentiment and Automation Analysis endpoints
+			analytics.GET("/sentiment", analyticsHandler.GetSentimentAnalysis)
+			analytics.GET("/automation", analyticsHandler.GetAutomationAnalysis)
+			analytics.GET("/automation/reporting", analyticsHandler.GetITProcessAutomationReporting)
+			analytics.GET("/summary", analyticsHandler.GetAnalyticsSummary)
+		}
 	}
 
 	log.Println("Starting server on :8080")

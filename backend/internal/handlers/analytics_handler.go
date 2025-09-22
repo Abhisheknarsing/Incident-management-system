@@ -3,7 +3,6 @@ package handlers
 import (
 	"database/sql"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -253,6 +252,170 @@ func (h *AnalyticsHandler) GetTimelineOverview(c *gin.Context) {
 			"metrics":  weeklyMetrics,
 			"trends":   weeklyTrends,
 		},
+		"filters": filters,
+	})
+}
+
+// GetPriorityAnalysis handles GET /api/analytics/priority
+func (h *AnalyticsHandler) GetPriorityAnalysis(c *gin.Context) {
+	filters, err := parseTimelineFilters(c)
+	if err != nil {
+		sendError(c, "INVALID_DATE_FORMAT", "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest, err.Error())
+		return
+	}
+
+	analysis, err := h.analyticsService.GetPriorityAnalysis(c.Request.Context(), filters)
+	if err != nil {
+		sendError(c, "DATABASE_ERROR", "Failed to retrieve priority analysis", http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":    analysis,
+		"filters": filters,
+		"count":   len(analysis),
+	})
+}
+
+// GetApplicationAnalysis handles GET /api/analytics/applications
+func (h *AnalyticsHandler) GetApplicationAnalysis(c *gin.Context) {
+	filters, err := parseTimelineFilters(c)
+	if err != nil {
+		sendError(c, "INVALID_DATE_FORMAT", "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest, err.Error())
+		return
+	}
+
+	analysis, err := h.analyticsService.GetApplicationAnalysis(c.Request.Context(), filters)
+	if err != nil {
+		sendError(c, "DATABASE_ERROR", "Failed to retrieve application analysis", http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":    analysis,
+		"filters": filters,
+		"count":   len(analysis),
+	})
+}
+
+// GetResolutionAnalysis handles GET /api/analytics/resolution
+func (h *AnalyticsHandler) GetResolutionAnalysis(c *gin.Context) {
+	filters, err := parseTimelineFilters(c)
+	if err != nil {
+		sendError(c, "INVALID_DATE_FORMAT", "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest, err.Error())
+		return
+	}
+
+	metrics, err := h.analyticsService.GetResolutionAnalysis(c.Request.Context(), filters)
+	if err != nil {
+		sendError(c, "DATABASE_ERROR", "Failed to retrieve resolution analysis", http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":    metrics,
+		"filters": filters,
+	})
+}
+
+// GetPerformanceMetrics handles GET /api/analytics/performance
+func (h *AnalyticsHandler) GetPerformanceMetrics(c *gin.Context) {
+	filters, err := parseTimelineFilters(c)
+	if err != nil {
+		sendError(c, "INVALID_DATE_FORMAT", "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest, err.Error())
+		return
+	}
+
+	metrics, err := h.analyticsService.GetPerformanceMetrics(c.Request.Context(), filters)
+	if err != nil {
+		sendError(c, "DATABASE_ERROR", "Failed to retrieve performance metrics", http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":    metrics,
+		"filters": filters,
+	})
+}
+
+// GetSentimentAnalysis handles GET /api/analytics/sentiment
+func (h *AnalyticsHandler) GetSentimentAnalysis(c *gin.Context) {
+	filters, err := parseTimelineFilters(c)
+	if err != nil {
+		sendError(c, "INVALID_DATE_FORMAT", "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest, err.Error())
+		return
+	}
+
+	analysis, err := h.analyticsService.GetSentimentAnalysis(c.Request.Context(), filters)
+	if err != nil {
+		sendError(c, "DATABASE_ERROR", "Failed to retrieve sentiment analysis", http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":    analysis,
+		"filters": filters,
+		"count":   len(analysis),
+	})
+}
+
+// GetAutomationAnalysis handles GET /api/analytics/automation
+func (h *AnalyticsHandler) GetAutomationAnalysis(c *gin.Context) {
+	filters, err := parseTimelineFilters(c)
+	if err != nil {
+		sendError(c, "INVALID_DATE_FORMAT", "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest, err.Error())
+		return
+	}
+
+	analysis, err := h.analyticsService.GetAutomationAnalysis(c.Request.Context(), filters)
+	if err != nil {
+		sendError(c, "DATABASE_ERROR", "Failed to retrieve automation analysis", http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":    analysis,
+		"filters": filters,
+		"count":   len(analysis),
+	})
+}
+
+// GetITProcessAutomationReporting handles GET /api/analytics/automation/reporting
+func (h *AnalyticsHandler) GetITProcessAutomationReporting(c *gin.Context) {
+	filters, err := parseTimelineFilters(c)
+	if err != nil {
+		sendError(c, "INVALID_DATE_FORMAT", "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest, err.Error())
+		return
+	}
+
+	reporting, err := h.analyticsService.GetITProcessAutomationReporting(c.Request.Context(), filters)
+	if err != nil {
+		sendError(c, "DATABASE_ERROR", "Failed to retrieve IT process automation reporting", http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":    reporting,
+		"filters": filters,
+	})
+}
+
+// GetAnalyticsSummary handles GET /api/analytics/summary
+func (h *AnalyticsHandler) GetAnalyticsSummary(c *gin.Context) {
+	filters, err := parseTimelineFilters(c)
+	if err != nil {
+		sendError(c, "INVALID_DATE_FORMAT", "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest, err.Error())
+		return
+	}
+
+	summary, err := h.analyticsService.GetAnalyticsSummary(c.Request.Context(), filters)
+	if err != nil {
+		sendError(c, "DATABASE_ERROR", "Failed to retrieve analytics summary", http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":    summary,
 		"filters": filters,
 	})
 }
