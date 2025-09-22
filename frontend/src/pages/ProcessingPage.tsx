@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
-import { EmptyState } from '@/components/ui/empty-state'
 import { useUploads, useUploadStatus, useStartAnalysis } from '@/hooks/useUploads'
 import { 
   FileSpreadsheet, 
@@ -346,16 +345,16 @@ export function ProcessingPage() {
           </div>
         </div>
       ) : (
-        <EmptyState
-          icon={FileText}
-          title="No uploads found"
-          description="Upload an Excel file to get started with incident data analysis."
-          action={
-            <Button asChild>
-              <a href="/">Upload File</a>
-            </Button>
-          }
-        />
+        <div className="flex flex-col items-center justify-center text-center p-8">
+          <FileText className="h-12 w-12 mb-4 text-muted-foreground" />
+          <h3 className="text-lg font-semibold mb-2">No uploads found</h3>
+          <p className="text-muted-foreground mb-4 max-w-md">
+            Upload an Excel file to get started with incident data analysis.
+          </p>
+          <Button asChild>
+            <a href="/">Upload File</a>
+          </Button>
+        </div>
       )}
 
       {/* Processing Statistics */}

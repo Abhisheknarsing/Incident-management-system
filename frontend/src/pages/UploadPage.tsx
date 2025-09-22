@@ -136,23 +136,10 @@ export function UploadPage() {
 
     try {
       await uploadMutation.mutateAsync(uploadState.file)
-      setUploadState(prev => ({ ...prev, uploadProgress: 100 }))
+      setUploadState(prev => ({ ...prev, uploadProgress: 100, isUploading: false }))
       
-      // Reset form after successful upload
-      setTimeout(() => {
-        setUploadState({
-          file: null,
-          isDragOver: false,
-          uploadProgress: 0,
-          isUploading: false,
-          error: null,
-          preview: null,
-        })
-        if (fileInputRef.current) {
-          fileInputRef.current.value = ''
-        }
-        refetchUploads()
-      }, 1000)
+      // Refresh uploads list to show the newly uploaded file
+      refetchUploads()
       
     } catch (error: any) {
       setUploadState(prev => ({
@@ -301,8 +288,32 @@ export function UploadPage() {
           {uploadState.uploadProgress === 100 && !uploadState.error && (
             <Alert>
               <CheckCircle className="h-4 w-4" />
-              <AlertDescription>
-                File uploaded successfully! You can now analyze the data from the Processing page.
+              <AlertDescription className="flex items-center justify-between">
+                <span>File uploaded successfully! You can now analyze the data from the Processing page.</span>
+                <div className="space-x-2">
+                  <Button variant="outline" size="sm" asChild>
+                    <a href="/processing">Go to Processing</a>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      setUploadState({
+                        file: null,
+                        isDragOver: false,
+                        uploadProgress: 0,
+                        isUploading: false,
+                        error: null,
+                        preview: null,
+                      })
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = ''
+                      }
+                    }}
+                  >
+                    Upload Another
+                  </Button>
+                </div>
               </AlertDescription>
             </Alert>
           )}
@@ -322,7 +333,7 @@ export function UploadPage() {
       </Card>
 
       {/* Recent Uploads */}
-      {uploads && uploads.length > 0 && (
+      {uploads && Array.isArray(uploads) && uploads.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Recent Uploads</CardTitle>
@@ -332,35 +343,38 @@ export function UploadPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {uploads.slice(0, 5).map((upload) => (
-                <div
-                  key={upload.id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
-                >
-                  <div className="flex items-center space-x-3">
-                    <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium text-sm">{upload.original_filename}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(upload.created_at).toLocaleDateString()} • {upload.record_count} records
-                      </p>
-                    </div>
-                  </div>
-                  <Badge
-                    variant={
-                      upload.status === 'completed'
-                        ? 'default'
-                        : upload.status === 'failed'
-                        ? 'destructive'
-                        : upload.status === 'processing'
-                        ? 'secondary'
-                        : 'outline'
-                    }
+              {uploads
+                .slice(0, 5)
+                .filter((upload) => upload && upload.id) // Filter out invalid uploads
+                .map((upload) => (
+                  <div
+                    key={upload.id} // Ensure each upload has a unique key
+                    className="flex items-center justify-between p-3 border rounded-lg"
                   >
-                    {upload.status}
-                  </Badge>
-                </div>
-              ))}
+                    <div className="flex items-center space-x-3">
+                      <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium text-sm">{upload.original_filename}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(upload.created_at).toLocaleDateString()} • {upload.record_count} records
+                        </p>
+                      </div>
+                    </div>
+                    <Badge
+                      variant={
+                        upload.status === 'completed'
+                          ? 'default'
+                          : upload.status === 'failed'
+                          ? 'destructive'
+                          : upload.status === 'processing'
+                          ? 'secondary'
+                          : 'outline'
+                      }
+                    >
+                      {upload.status}
+                    </Badge>
+                  </div>
+                ))}
             </div>
           </CardContent>
         </Card>

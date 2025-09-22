@@ -1,16 +1,12 @@
 import * as React from "react"
 import { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Button } from "./button"
 
 interface EmptyStateProps {
   icon?: LucideIcon | React.ReactNode
   title: string
   description?: string
-  action?: React.ReactNode | {
-    label: string
-    onClick: () => void
-  }
+  action?: React.ReactNode
   className?: string
 }
 
@@ -32,17 +28,9 @@ export function EmptyState({ icon, title, description, action, className }: Empt
       {description && (
         <p className="text-muted-foreground mb-4 max-w-md">{description}</p>
       )}
-      {action && (
-        <div>
-          {React.isValidElement(action) ? (
-            action
-          ) : typeof action === 'object' && 'label' in action ? (
-            <Button onClick={action.onClick}>
-              {action.label}
-            </Button>
-          ) : null}
-        </div>
-      )}
+      <div>
+        {action}
+      </div>
     </div>
   )
 }

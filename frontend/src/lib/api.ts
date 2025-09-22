@@ -71,7 +71,7 @@ export const apiClient = {
   // Upload endpoints
   uploads: {
     list: (): Promise<Upload[]> => 
-      api.get('/uploads').then(res => res.data),
+      api.get('/uploads').then(res => res.data.uploads || []),
     
     upload: (file: File, onProgress?: (progress: number) => void): Promise<Upload> => {
       const formData = new FormData()

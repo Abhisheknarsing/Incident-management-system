@@ -13,12 +13,21 @@ export function useUploads() {
   
   return useQuery<Upload[]>({
     queryKey: QUERY_KEYS.uploads,
-    queryFn: apiClient.uploads.list,
+    queryFn: async () => {
+      try {
+        const data = await apiClient.uploads.list();
+        // Ensure we always return an array
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        // Handle error and return empty array as fallback
+        handleError(error, 'Failed to load uploads');
+        return [];
+      }
+    },
     staleTime: 1000 * 60 * 2, // 2 minutes
     refetchInterval: 1000 * 30, // Refetch every 30 seconds
-    onError: (error) => {
-      handleError(error, 'Failed to load uploads')
-    },
+    // Ensure we always have an array, even if the API returns undefined
+    initialData: [],
   })
 }
 
