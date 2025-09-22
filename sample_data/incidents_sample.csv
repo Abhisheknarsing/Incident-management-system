@@ -1,0 +1,11 @@
+incident_id,report_date,resolve_date,last_resolve_date,brief_description,description,application_name,resolution_group,resolved_person,priority,category,subcategory,impact,urgency,status
+INC-001,2025-09-01,2025-09-01,2025-09-01,Database connection timeout,Users experiencing timeout when connecting to the database,Database Service,DBA Team,john.doe@company.com,P1,Database,Connection,High,High,Resolved
+INC-002,2025-09-02,,2025-09-03,Application crashes on login,Mobile app crashes when users try to log in,Mobile App,Mobile Team,jane.smith@company.com,P2,Application,Crash,Medium,Medium,In Progress
+INC-003,2025-09-03,2025-09-03,,Slow API response times,API endpoints are responding slowly affecting user experience,API Gateway,API Team,mike.johnson@company.com,P3,Performance,Latency,Low,Low,Resolved
+INC-004,2025-09-04,,,Network connectivity issues,Intermittent network connectivity issues in the development department,Network Infrastructure,Network Team,sarah.williams@company.com,P4,Network,Connectivity,Low,Low,Open
+INC-005,2025-09-05,2025-09-05,2025-09-05,Email delivery failure,Emails not being delivered to external recipients,Email Service,Email Team,david.brown@company.com,P1,Email,Delivery,High,High,Resolved
+INC-006,2025-09-06,,2025-09-07,User access denied,Users receiving access denied errors when accessing the portal,User Portal,Security Team,lisa.taylor@company.com,P2,Security,Access,Medium,Medium,In Progress
+INC-007,2025-09-07,2025-09-07,,File upload fails,Users unable to upload files larger than 10MB,File Storage,Storage Team,robert.wilson@company.com,P3,Storage,Upload,Low,Low,Resolved
+INC-008,2025-09-08,,,Printer not responding,Office printer is not responding to print requests,Print Services,IT Support,tom.anderson@company.com,P4,Hardware,Printer,Low,Low,Open
+INC-009,2025-09-09,2025-09-09,2025-09-09,Authentication failure,Users unable to authenticate with SSO,Authentication Service,Security Team,amy.clark@company.com,P1,Security,Authentication,High,High,Resolved
+INC-010,2025-09-10,,2025-09-11,Dashboard loading slowly,Dashboard takes more than 30 seconds to load,Analytics Dashboard,Analytics Team,kevin.miller@company.com,P2,Performance,Loading,Medium,Medium,In Progress

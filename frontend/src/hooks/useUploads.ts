@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient, ProcessingStatus } from '@/lib/api'
 import { Upload } from '@/types'
+import { useErrorHandler } from '@/hooks/useErrorHandler'
 
 export const QUERY_KEYS = {
   uploads: ['uploads'] as const,
@@ -8,16 +9,22 @@ export const QUERY_KEYS = {
 }
 
 export function useUploads() {
+  const { handleError } = useErrorHandler()
+  
   return useQuery({
     queryKey: QUERY_KEYS.uploads,
     queryFn: apiClient.uploads.list,
     staleTime: 1000 * 60 * 2, // 2 minutes
     refetchInterval: 1000 * 30, // Refetch every 30 seconds
+    onError: (error) => {
+      handleError(error, 'Failed to load uploads')
+    },
   })
 }
 
 export function useUploadFile(onProgress?: (progress: number) => void) {
   const queryClient = useQueryClient()
+  const { handleError } = useErrorHandler()
   
   return useMutation({
     mutationFn: (file: File) => apiClient.uploads.upload(file, onProgress),
@@ -29,12 +36,14 @@ export function useUploadFile(onProgress?: (progress: number) => void) {
       ])
     },
     onError: (error) => {
-      console.error('Upload failed:', error)
+      handleError(error, 'File upload failed')
     },
   })
 }
 
 export function useUploadStatus(uploadId: string, enabled = true) {
+  const { handleError } = useErrorHandler()
+  
   return useQuery<ProcessingStatus>({
     queryKey: QUERY_KEYS.uploadStatus(uploadId),
     queryFn: () => apiClient.uploads.getStatus(uploadId),
@@ -48,11 +57,15 @@ export function useUploadStatus(uploadId: string, enabled = true) {
       return 2000
     },
     staleTime: 0, // Always fetch fresh status
+    onError: (error) => {
+      handleError(error, 'Failed to get upload status')
+    },
   })
 }
 
 export function useStartAnalysis() {
   const queryClient = useQueryClient()
+  const { handleError } = useErrorHandler()
   
   return useMutation({
     mutationFn: apiClient.uploads.startAnalysis,
@@ -67,7 +80,7 @@ export function useStartAnalysis() {
       })
     },
     onError: (error) => {
-      console.error('Analysis start failed:', error)
+      handleError(error, 'Failed to start analysis')
     },
   })
 }

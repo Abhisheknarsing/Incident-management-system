@@ -26,7 +26,7 @@ func NewProcessingService(db *sql.DB, fileStore *storage.FileStore) *ProcessingS
 	return &ProcessingService{
 		db:                 db,
 		fileStore:          fileStore,
-		excelParser:        NewExcelParser(),
+		excelParser:        NewExcelParser(DefaultExcelParserConfig()),
 		incidentService:    NewIncidentService(db),
 		sentimentAnalyzer:  NewSimpleSentimentAnalyzer(),
 		automationAnalyzer: NewSimpleAutomationAnalyzer(),
@@ -35,16 +35,16 @@ func NewProcessingService(db *sql.DB, fileStore *storage.FileStore) *ProcessingS
 
 // ProcessingProgress represents the progress of file processing
 type ProcessingProgress struct {
-	UploadID      string    `json:"upload_id"`
-	Status        string    `json:"status"`
-	TotalRows     int       `json:"total_rows"`
-	ProcessedRows int       `json:"processed_rows"`
-	ValidRows     int       `json:"valid_rows"`
-	ErrorCount    int       `json:"error_count"`
-	Errors        []string  `json:"errors"`
-	StartTime     time.Time `json:"start_time"`
+	UploadID      string     `json:"upload_id"`
+	Status        string     `json:"status"`
+	TotalRows     int        `json:"total_rows"`
+	ProcessedRows int        `json:"processed_rows"`
+	ValidRows     int        `json:"valid_rows"`
+	ErrorCount    int        `json:"error_count"`
+	Errors        []string   `json:"errors"`
+	StartTime     time.Time  `json:"start_time"`
 	EndTime       *time.Time `json:"end_time,omitempty"`
-	Duration      string    `json:"duration,omitempty"`
+	Duration      string     `json:"duration,omitempty"`
 }
 
 // ProcessUpload processes an uploaded Excel file
@@ -73,18 +73,31 @@ func (s *ProcessingService) ProcessUpload(ctx context.Context, uploadID string) 
 
 	// Parse Excel file
 	log.Printf("Starting to parse Excel file: %s", filePath)
-	parseResult, err := s.excelParser.ParseExcelFile(filePath, uploadID)
+	incidents, err := s.excelParser.ParseFile(ctx, filePath)
 	if err != nil {
 		errorMsg := fmt.Sprintf("Failed to parse Excel file: %v", err)
 		s.markProcessingFailed(ctx, uploadID, []string{errorMsg})
 		return nil, fmt.Errorf("failed to parse Excel file: %w", err)
 	}
 
+	// Create a mock ParseResult for compatibility
+	parseResult := &struct {
+		Incidents []models.Incident
+		TotalRows int
+		ValidRows int
+		Errors    []models.ValidationError
+	}{
+		Incidents: incidents,
+		TotalRows: len(incidents),
+		ValidRows: len(incidents),
+		Errors:    []models.ValidationError{},
+	}
+
 	progress.TotalRows = parseResult.TotalRows
 	progress.ValidRows = parseResult.ValidRows
 	progress.ErrorCount = len(parseResult.Errors)
 
-	log.Printf("Parsed Excel file: %d total rows, %d valid rows, %d errors", 
+	log.Printf("Parsed Excel file: %d total rows, %d valid rows, %d errors",
 		parseResult.TotalRows, parseResult.ValidRows, len(parseResult.Errors))
 
 	// Collect error messages
@@ -98,7 +111,7 @@ func (s *ProcessingService) ProcessUpload(ctx context.Context, uploadID string) 
 	var insertResult *BatchInsertResult
 	if len(parseResult.Incidents) > 0 {
 		log.Printf("Processing %d incidents with analysis", len(parseResult.Incidents))
-		
+
 		// Process incidents with sentiment and automation analysis
 		err = s.processIncidentsWithAnalysis(parseResult.Incidents)
 		if err != nil {
@@ -133,7 +146,7 @@ func (s *ProcessingService) ProcessUpload(ctx context.Context, uploadID string) 
 	}
 
 	// Update final upload status
-	err = s.incidentService.UpdateUploadStatus(ctx, uploadID, finalStatus, 
+	err = s.incidentService.UpdateUploadStatus(ctx, uploadID, finalStatus,
 		progress.TotalRows, progress.ProcessedRows, progress.ErrorCount, errorMessages)
 	if err != nil {
 		log.Printf("Warning: Failed to update final upload status: %v", err)
@@ -145,7 +158,7 @@ func (s *ProcessingService) ProcessUpload(ctx context.Context, uploadID string) 
 	progress.Status = finalStatus
 	progress.Duration = endTime.Sub(progress.StartTime).String()
 
-	log.Printf("Processing completed for upload %s: status=%s, processed=%d, errors=%d", 
+	log.Printf("Processing completed for upload %s: status=%s, processed=%d, errors=%d",
 		uploadID, finalStatus, progress.ProcessedRows, progress.ErrorCount)
 
 	return progress, nil
@@ -252,7 +265,7 @@ func (s *ProcessingService) processIncidentsWithAnalysis(incidents []models.Inci
 			sentimentResult, err := s.sentimentAnalyzer.AnalyzeSentiment(
 				incidents[i].BriefDescription + " " + incidents[i].Description)
 			if err != nil {
-				log.Printf("Warning: Sentiment analysis failed for incident %s: %v", 
+				log.Printf("Warning: Sentiment analysis failed for incident %s: %v",
 					incidents[i].IncidentID, err)
 			} else {
 				incidents[i].SentimentScore = &sentimentResult.Score
@@ -264,7 +277,7 @@ func (s *ProcessingService) processIncidentsWithAnalysis(incidents []models.Inci
 		if s.automationAnalyzer != nil {
 			automationResult, err := s.automationAnalyzer.AnalyzeAutomation(&incidents[i])
 			if err != nil {
-				log.Printf("Warning: Automation analysis failed for incident %s: %v", 
+				log.Printf("Warning: Automation analysis failed for incident %s: %v",
 					incidents[i].IncidentID, err)
 			} else {
 				incidents[i].AutomationScore = &automationResult.Score

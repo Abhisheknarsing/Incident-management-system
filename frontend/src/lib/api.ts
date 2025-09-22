@@ -1,15 +1,8 @@
-import axios, { AxiosError } from 'axios'
+import axios, { AxiosError, AxiosResponse } from 'axios'
 import { Upload, DashboardData, TimelineData, PriorityAnalysis, ApplicationAnalysis, SentimentAnalysis, ResolutionMetrics, AutomationAnalysis } from '@/types'
+import { APIError } from '@/lib/errors'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
-
-export interface APIError {
-  code: string
-  message: string
-  details?: any
-  timestamp: string
-  request_id: string
-}
 
 export interface ValidationError {
   field: string
@@ -50,14 +43,22 @@ api.interceptors.request.use(
 // Response interceptor for handling errors
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<APIError>) => {
+  (error: AxiosError) => {
     // Handle common errors here
+    const responseData = error.response?.data as any
+    
     const apiError: APIError = {
-      code: error.response?.data?.code || 'UNKNOWN_ERROR',
-      message: error.response?.data?.message || error.message || 'An unexpected error occurred',
-      details: error.response?.data?.details,
+      code: responseData?.code || 'UNKNOWN_ERROR',
+      message: responseData?.message || error.message || 'An unexpected error occurred',
+      details: responseData?.details,
+      validations: responseData?.validations,
       timestamp: new Date().toISOString(),
       request_id: error.config?.headers?.['X-Request-ID'] as string || 'unknown',
+      path: error.config?.url,
+      method: error.config?.method?.toUpperCase(),
+      user_message: responseData?.user_message,
+      suggestions: responseData?.suggestions,
+      documentation: responseData?.documentation,
     }
 
     console.error('API Error:', apiError)

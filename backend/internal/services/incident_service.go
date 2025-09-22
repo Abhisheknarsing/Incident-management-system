@@ -55,7 +55,7 @@ func (s *IncidentService) BatchInsertIncidents(ctx context.Context, incidents []
 	result := &BatchInsertResult{
 		InsertedCount: 0,
 		Errors:        make([]models.ValidationError, 0),
-		Success:       false,
+		Success:       true, // Default to true, only set to false on critical errors
 	}
 
 	// Prepare insert statement
@@ -81,7 +81,7 @@ func (s *IncidentService) BatchInsertIncidents(ctx context.Context, incidents []
 
 	// Check for duplicate incident IDs within the upload
 	duplicateMap := make(map[string]bool)
-	
+
 	// Insert incidents one by one to handle individual errors
 	for i, incident := range incidents {
 		// Check for duplicates within this batch
@@ -190,14 +190,14 @@ func (s *IncidentService) BatchInsertIncidents(ctx context.Context, incidents []
 		result.InsertedCount++
 	}
 
-	// Commit transaction if we have any successful inserts
-	if result.InsertedCount > 0 {
+	// Commit transaction if we have any successful inserts or if there were only validation errors
+	if result.InsertedCount > 0 || len(result.Errors) > 0 {
 		if err = tx.Commit(); err != nil {
 			return nil, fmt.Errorf("failed to commit transaction: %w", err)
 		}
-		result.Success = true
+		// Success remains true for validation errors, only set to false on critical database errors
 	} else {
-		// Rollback if no successful inserts
+		// Rollback if no successful inserts and no validation errors (critical error)
 		tx.Rollback()
 		result.Success = false
 	}
@@ -208,13 +208,13 @@ func (s *IncidentService) BatchInsertIncidents(ctx context.Context, incidents []
 // checkIncidentExists checks if an incident ID already exists for the given upload
 func (s *IncidentService) checkIncidentExists(ctx context.Context, tx *sql.Tx, incidentID, uploadID string) (bool, error) {
 	query := "SELECT COUNT(*) FROM incidents WHERE incident_id = ? AND upload_id = ?"
-	
+
 	var count int
 	err := tx.QueryRowContext(ctx, query, incidentID, uploadID).Scan(&count)
 	if err != nil {
 		return false, err
 	}
-	
+
 	return count > 0, nil
 }
 
@@ -234,7 +234,7 @@ func (s *IncidentService) UpdateUploadStatus(ctx context.Context, uploadID strin
 	if err != nil {
 		return fmt.Errorf("failed to check existing upload: %w", err)
 	}
-	
+
 	if existingCount == 0 {
 		return fmt.Errorf("upload record not found: %s", uploadID)
 	}
@@ -291,7 +291,7 @@ func (s *IncidentService) GetIncidentsByUpload(ctx context.Context, uploadID str
 	var incidents []models.Incident
 	for rows.Next() {
 		var incident models.Incident
-		
+
 		err := rows.Scan(
 			&incident.ID,
 			&incident.UploadID,
@@ -323,11 +323,11 @@ func (s *IncidentService) GetIncidentsByUpload(ctx context.Context, uploadID str
 			&incident.CreatedAt,
 			&incident.UpdatedAt,
 		)
-		
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan incident: %w", err)
 		}
-		
+
 		incidents = append(incidents, incident)
 	}
 
@@ -341,7 +341,7 @@ func (s *IncidentService) GetIncidentsByUpload(ctx context.Context, uploadID str
 // DeleteIncidentsByUpload deletes all incidents for a specific upload (for rollback)
 func (s *IncidentService) DeleteIncidentsByUpload(ctx context.Context, uploadID string) error {
 	query := "DELETE FROM incidents WHERE upload_id = ?"
-	
+
 	_, err := s.db.ExecContext(ctx, query, uploadID)
 	if err != nil {
 		return fmt.Errorf("failed to delete incidents for upload %s: %w", uploadID, err)
@@ -353,7 +353,7 @@ func (s *IncidentService) DeleteIncidentsByUpload(ctx context.Context, uploadID 
 // GetIncidentCount returns the total number of incidents for an upload
 func (s *IncidentService) GetIncidentCount(ctx context.Context, uploadID string) (int, error) {
 	query := "SELECT COUNT(*) FROM incidents WHERE upload_id = ?"
-	
+
 	var count int
 	err := s.db.QueryRowContext(ctx, query, uploadID).Scan(&count)
 	if err != nil {

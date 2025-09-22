@@ -6,6 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"incident-management-system/internal/errors"
+	"incident-management-system/internal/logging"
+	"incident-management-system/internal/monitoring"
 	"incident-management-system/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -13,23 +16,31 @@ import (
 
 // AnalyticsHandler handles analytics and reporting endpoints
 type AnalyticsHandler struct {
-	analyticsService *services.AnalyticsService
+	analyticsService *services.CachedAnalyticsService
+	logger           *logging.Logger
 }
 
 // NewAnalyticsHandler creates a new analytics handler
 func NewAnalyticsHandler(db *sql.DB) *AnalyticsHandler {
-	return &AnalyticsHandler{
-		analyticsService: services.NewAnalyticsService(db),
-	}
-}
+	// Create base analytics service
+	baseService := services.NewAnalyticsService(db)
 
-// APIError represents a standardized API error response
-type APIError struct {
-	Code      string      `json:"code"`
-	Message   string      `json:"message"`
-	Details   interface{} `json:"details,omitempty"`
-	Timestamp time.Time   `json:"timestamp"`
-	RequestID string      `json:"request_id"`
+	// Create cached analytics service
+	cachedService, err := services.NewCachedAnalyticsService(baseService, nil)
+	if err != nil {
+		// Fallback to non-cached service if cache initialization fails
+		logger := logging.GetGlobalLogger().WithComponent("analytics_handler")
+		logger.Error("Failed to initialize cache service", err)
+		return &AnalyticsHandler{
+			analyticsService: &services.CachedAnalyticsService{AnalyticsService: baseService},
+			logger:           logger,
+		}
+	}
+
+	return &AnalyticsHandler{
+		analyticsService: cachedService,
+		logger:           logging.GetGlobalLogger().WithComponent("analytics_handler"),
+	}
 }
 
 // parseTimelineFilters parses query parameters into TimelineFilters
@@ -72,31 +83,42 @@ func parseTimelineFilters(c *gin.Context) (*services.TimelineFilters, error) {
 	return filters, nil
 }
 
-// sendError sends a standardized error response
-func sendError(c *gin.Context, code string, message string, statusCode int, details interface{}) {
-	apiError := APIError{
-		Code:      code,
-		Message:   message,
-		Details:   details,
-		Timestamp: time.Now(),
-		RequestID: c.GetString("request_id"),
-	}
-	c.JSON(statusCode, apiError)
+// sendError is a helper function to send error responses
+func sendError(c *gin.Context, code errors.ErrorCode, message string, status int, details interface{}) {
+	apiErr := errors.NewAPIError(code, message).WithDetails(details)
+	errors.SendError(c, apiErr)
 }
 
 // GetDailyTimeline handles GET /api/analytics/timeline/daily
 func (h *AnalyticsHandler) GetDailyTimeline(c *gin.Context) {
+	start := time.Now()
+	logger := h.logger.WithContext(c.Request.Context()).WithOperation("get_daily_timeline")
+
+	logger.Info("Getting daily timeline")
+
 	filters, err := parseTimelineFilters(c)
 	if err != nil {
-		sendError(c, "INVALID_DATE_FORMAT", "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest, err.Error())
+		apiErr := errors.NewAPIError(errors.ErrInvalidDateFormat, "Invalid date format. Use YYYY-MM-DD").
+			WithDetails(err.Error()).
+			WithUserMessage("Please use the correct date format (YYYY-MM-DD)")
+		errors.SendError(c, apiErr)
 		return
 	}
 
 	timeline, err := h.analyticsService.GetDailyTimeline(c.Request.Context(), filters)
 	if err != nil {
-		sendError(c, "DATABASE_ERROR", "Failed to retrieve daily timeline", http.StatusInternalServerError, err.Error())
+		apiErr := errors.DatabaseError("retrieve daily timeline", err)
+		monitoring.TrackError(c.Request.Context(), apiErr, "analytics_handler", "get_daily_timeline")
+		errors.SendError(c, apiErr)
 		return
 	}
+
+	logger.LogDuration("get_daily_timeline", start,
+		logging.GetGlobalLogger().WithMetadata(map[string]interface{}{
+			"count": len(timeline),
+		}))
+
+	monitoring.UpdatePerformance(time.Since(start))
 
 	c.JSON(http.StatusOK, gin.H{
 		"data":    timeline,
@@ -107,17 +129,27 @@ func (h *AnalyticsHandler) GetDailyTimeline(c *gin.Context) {
 
 // GetWeeklyTimeline handles GET /api/analytics/timeline/weekly
 func (h *AnalyticsHandler) GetWeeklyTimeline(c *gin.Context) {
+	start := time.Now()
+	logger := h.logger.WithContext(c.Request.Context()).WithOperation("get_weekly_timeline")
+
 	filters, err := parseTimelineFilters(c)
 	if err != nil {
-		sendError(c, "INVALID_DATE_FORMAT", "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest, err.Error())
+		apiErr := errors.NewAPIError(errors.ErrInvalidDateFormat, "Invalid date format. Use YYYY-MM-DD").
+			WithDetails(err.Error())
+		errors.SendError(c, apiErr)
 		return
 	}
 
 	timeline, err := h.analyticsService.GetWeeklyTimeline(c.Request.Context(), filters)
 	if err != nil {
-		sendError(c, "DATABASE_ERROR", "Failed to retrieve weekly timeline", http.StatusInternalServerError, err.Error())
+		apiErr := errors.DatabaseError("retrieve weekly timeline", err)
+		monitoring.TrackError(c.Request.Context(), apiErr, "analytics_handler", "get_weekly_timeline")
+		errors.SendError(c, apiErr)
 		return
 	}
+
+	logger.LogDuration("get_weekly_timeline", start)
+	monitoring.UpdatePerformance(time.Since(start))
 
 	c.JSON(http.StatusOK, gin.H{
 		"data":    timeline,
@@ -128,23 +160,40 @@ func (h *AnalyticsHandler) GetWeeklyTimeline(c *gin.Context) {
 
 // GetTrendAnalysis handles GET /api/analytics/trends
 func (h *AnalyticsHandler) GetTrendAnalysis(c *gin.Context) {
+	start := time.Now()
+	logger := h.logger.WithContext(c.Request.Context()).WithOperation("get_trend_analysis")
+
 	period := c.DefaultQuery("period", "daily")
 	if period != "daily" && period != "weekly" {
-		sendError(c, "INVALID_PARAMETER", "Period must be 'daily' or 'weekly'", http.StatusBadRequest, nil)
+		apiErr := errors.NewAPIError(errors.ErrInvalidParameter, "Period must be 'daily' or 'weekly'").
+			WithUserMessage("Please specify a valid period: 'daily' or 'weekly'")
+		errors.SendError(c, apiErr)
 		return
 	}
 
 	filters, err := parseTimelineFilters(c)
 	if err != nil {
-		sendError(c, "INVALID_DATE_FORMAT", "Invalid date format. Use YYYY-MM-DD", http.StatusBadRequest, err.Error())
+		apiErr := errors.NewAPIError(errors.ErrInvalidDateFormat, "Invalid date format. Use YYYY-MM-DD").
+			WithDetails(err.Error())
+		errors.SendError(c, apiErr)
 		return
 	}
 
 	trends, err := h.analyticsService.GetTrendAnalysis(c.Request.Context(), period, filters)
 	if err != nil {
-		sendError(c, "DATABASE_ERROR", "Failed to retrieve trend analysis", http.StatusInternalServerError, err.Error())
+		apiErr := errors.DatabaseError("retrieve trend analysis", err)
+		monitoring.TrackError(c.Request.Context(), apiErr, "analytics_handler", "get_trend_analysis")
+		errors.SendError(c, apiErr)
 		return
 	}
+
+	logger.LogDuration("get_trend_analysis", start,
+		logging.GetGlobalLogger().WithMetadata(map[string]interface{}{
+			"period": period,
+			"count":  len(trends),
+		}))
+
+	monitoring.UpdatePerformance(time.Since(start))
 
 	c.JSON(http.StatusOK, gin.H{
 		"data":    trends,

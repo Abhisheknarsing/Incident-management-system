@@ -1,148 +1,188 @@
 # Incident Management System
 
-A full-stack web application for processing incident data from Excel uploads and providing comprehensive analytics through an interactive dashboard.
+A comprehensive incident management and analytics platform built with Go backend and React frontend.
+
+## Features
+
+- **File Upload**: Upload Excel files containing incident data
+- **Data Processing**: Automated processing with sentiment analysis and automation opportunity identification
+- **Analytics Dashboard**: Interactive visualizations for incident trends, priorities, applications, and resolution metrics
+- **Export Functionality**: Export data and analytics in multiple formats
+- **Performance Monitoring**: Built-in performance and memory monitoring
+- **Error Handling**: Comprehensive error handling and logging
 
 ## Technology Stack
 
 ### Backend
-- **Go 1.21+** with Gin framework
-- **DuckDB** for analytical data storage
-- **Excelize** library for Excel file processing
-- RESTful API design
+- **Language**: Go
+- **Framework**: Gin
+- **Database**: SQLite (with potential for PostgreSQL/MySQL)
+- **Excel Processing**: Custom Excel parser
+- **Caching**: Ristretto
+- **Logging**: Structured JSON logging
 
 ### Frontend
-- **React 18+** with Vite
-- **ShadCN UI** component library
-- **Recharts** for data visualization
-- **React Query** for API state management
-- **Tailwind CSS** for styling
+- **Framework**: React with TypeScript
+- **Build Tool**: Vite
+- **UI Library**: Tailwind CSS with custom components
+- **Charts**: Recharts
+- **State Management**: Zustand
+- **HTTP Client**: Axios
+- **Data Fetching**: React Query
+
+## Prerequisites
+
+- Go 1.19+
+- Node.js 16+
+- npm 8+
+- Git
+
+## Quick Start
+
+### Backend Setup
+```bash
+# Clone the repository
+git clone https://github.com/your-username/incident-management-system.git
+cd incident-management-system/backend
+
+# Install dependencies
+go mod tidy
+
+# Build and run
+go build -o main .
+./main
+```
+
+The backend server will start on port 8080.
+
+### Frontend Setup
+```bash
+# Navigate to frontend directory
+cd ../frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+The frontend development server will start on port 5173 (or another available port).
 
 ## Project Structure
 
 ```
-├── backend/                 # Go backend application
+incident-management-system/
+├── backend/
+│   ├── cmd/
 │   ├── internal/
-│   │   ├── models/         # Data models and structures
-│   │   ├── handlers/       # HTTP request handlers
-│   │   ├── services/       # Business logic services
-│   │   └── database/       # Database connection and queries
-│   ├── uploads/            # Uploaded Excel files storage
-│   ├── go.mod              # Go module dependencies
-│   └── main.go             # Application entry point
-├── frontend/               # React frontend application
+│   │   ├── handlers/
+│   │   ├── services/
+│   │   ├── database/
+│   │   ├── models/
+│   │   ├── logging/
+│   │   ├── monitoring/
+│   │   ├── storage/
+│   │   └── errors/
+│   ├── uploads/
+│   └── main.go
+├── frontend/
 │   ├── src/
-│   │   ├── components/     # Reusable UI components
-│   │   ├── pages/          # Page components
-│   │   ├── lib/            # Utility functions and API client
-│   │   └── types/          # TypeScript type definitions
-│   ├── package.json        # Node.js dependencies
-│   └── vite.config.ts      # Vite configuration
-├── Makefile               # Build and development scripts
-└── README.md              # Project documentation
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   ├── lib/
+│   │   ├── pages/
+│   │   ├── types/
+│   │   └── App.tsx
+│   ├── public/
+│   └── package.json
+├── sample_data/
+│   ├── incidents_sample.csv
+│   ├── incidents_sample.xlsx
+│   ├── incidents_large_sample.csv
+│   └── incidents_large_sample.xlsx
+├── docs/
+│   ├── user_guide.md
+│   ├── api_documentation.md
+│   └── deployment_guide.md
+├── scripts/
+│   └── csv_to_excel.py
+└── README.md
 ```
 
-## Getting Started
+## API Documentation
 
-### Prerequisites
-- Go 1.21 or higher
-- Node.js 18 or higher
-- npm or yarn
+Detailed API documentation is available in [docs/api_documentation.md](docs/api_documentation.md).
 
-### Installation
+## Sample Data
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   make install
-   ```
+The project includes sample data files for testing:
+- [sample_data/incidents_sample.xlsx](sample_data/incidents_sample.xlsx) - Small sample dataset
+- [sample_data/incidents_large_sample.xlsx](sample_data/incidents_large_sample.xlsx) - Larger sample dataset
 
-### Development
+## Documentation
 
-Start both backend and frontend in development mode:
-```bash
-make dev
-```
+- [User Guide](docs/user_guide.md) - Instructions for using the application
+- [API Documentation](docs/api_documentation.md) - Detailed API endpoints and usage
+- [Deployment Guide](docs/deployment_guide.md) - Instructions for deploying to production
 
-Or start them separately:
-```bash
-# Backend only (http://localhost:8080)
-make backend-dev
+## Key Components
 
-# Frontend only (http://localhost:5173)
-make frontend-dev
-```
+### Backend Services
+1. **Upload Service**: Handles file uploads and storage
+2. **Processing Service**: Processes Excel files and performs analysis
+3. **Analytics Service**: Generates incident analytics and metrics
+4. **Export Service**: Handles data export functionality
+5. **Monitoring Service**: Performance and memory monitoring
+6. **Logging Service**: Structured logging with different levels
 
-### Building for Production
+### Frontend Components
+1. **Upload Page**: File upload interface with drag-and-drop
+2. **Processing Page**: Data processing management and status tracking
+3. **Dashboard Page**: Analytics visualizations and metrics
+4. **Custom Charts**: Interactive charts for data visualization
+5. **Filter System**: Advanced filtering capabilities
+6. **Export Functionality**: Data export in multiple formats
 
-```bash
-make build
-```
+## Performance Optimizations
 
-### Available Commands
+- Database query caching with Ristretto
+- API response caching
+- Concurrent processing optimizations
+- Memory usage monitoring
+- Code splitting and lazy loading
+- Virtual scrolling for large data tables
+- Bundle size optimization
 
-- `make install` - Install all dependencies
-- `make dev` - Start development environment
-- `make build` - Build for production
-- `make test` - Run tests
-- `make clean` - Clean build artifacts
+## Error Handling
 
-## Features
+- Structured logging with different log levels
+- Error middleware for API endpoints
+- Standardized error response formats
+- Error tracking and monitoring
+- User-friendly error message display
+- Network error handling with retry mechanisms
 
-### Data Upload
-- Excel file upload (.xlsx, .xls)
-- File validation and error reporting
-- Upload progress tracking
+## Testing
 
-### Data Processing
-- Asynchronous data processing
-- Sentiment analysis of incident descriptions
-- Automation opportunity identification
-- Progress monitoring
-
-### Analytics Dashboard
-- Timeline visualization of incidents
-- Priority analysis and distribution
-- Application-wise incident breakdown
-- Sentiment analysis results
-- Resolution metrics and trends
-- Automation opportunities analysis
-
-### Export and Filtering
-- Multi-format export (CSV, PDF)
-- Real-time filtering capabilities
-- Date range, priority, and application filters
-
-## API Endpoints
-
-### Upload Management
-- `POST /api/uploads` - Upload Excel file
-- `GET /api/uploads` - List uploads with status
-- `POST /api/uploads/:id/analyze` - Start analysis
-- `GET /api/uploads/:id/status` - Get processing status
-
-### Analytics
-- `GET /api/analytics/timeline` - Timeline data
-- `GET /api/analytics/priorities` - Priority analysis
-- `GET /api/analytics/applications` - Application analysis
-- `GET /api/analytics/sentiment` - Sentiment analysis
-- `GET /api/analytics/resolution` - Resolution metrics
-- `GET /api/analytics/automation` - Automation opportunities
-
-### Export
-- `POST /api/export` - Export data in various formats
-
-## Development Status
-
-This project is currently in the initial setup phase. The basic project structure and dependencies have been configured. Upcoming development tasks include:
-
-1. Database setup and schema creation
-2. Excel file processing implementation
-3. Data analysis and processing engine
-4. Analytics API development
-5. Frontend dashboard implementation
-6. Export functionality
-7. Testing and optimization
+The application includes comprehensive testing:
+- Unit tests for backend services
+- Integration tests for API endpoints
+- Component tests for frontend interfaces
+- End-to-end user workflow testing
 
 ## Contributing
 
-Please refer to the task list in `.kiro/specs/incident-management-system/tasks.md` for current development priorities and implementation details.
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a pull request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+For support, please open an issue on the GitHub repository or contact the maintainers.

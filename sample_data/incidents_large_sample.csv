@@ -1,0 +1,41 @@
+incident_id,report_date,resolve_date,last_resolve_date,brief_description,description,application_name,resolution_group,resolved_person,priority,category,subcategory,impact,urgency,status
+INC-001,2025-09-01,2025-09-01,2025-09-01,Database connection timeout,Users experiencing timeout when connecting to the database,Database Service,DBA Team,john.doe@company.com,P1,Database,Connection,High,High,Resolved
+INC-002,2025-09-02,,2025-09-03,Application crashes on login,Mobile app crashes when users try to log in,Mobile App,Mobile Team,jane.smith@company.com,P2,Application,Crash,Medium,Medium,In Progress
+INC-003,2025-09-03,2025-09-03,,Slow API response times,API endpoints are responding slowly affecting user experience,API Gateway,API Team,mike.johnson@company.com,P3,Performance,Latency,Low,Low,Resolved
+INC-004,2025-09-04,,,Network connectivity issues,Intermittent network connectivity issues in the development department,Network Infrastructure,Network Team,sarah.williams@company.com,P4,Network,Connectivity,Low,Low,Open
+INC-005,2025-09-05,2025-09-05,2025-09-05,Email delivery failure,Emails not being delivered to external recipients,Email Service,Email Team,david.brown@company.com,P1,Email,Delivery,High,High,Resolved
+INC-006,2025-09-06,,2025-09-07,User access denied,Users receiving access denied errors when accessing the portal,User Portal,Security Team,lisa.taylor@company.com,P2,Security,Access,Medium,Medium,In Progress
+INC-007,2025-09-07,2025-09-07,,File upload fails,Users unable to upload files larger than 10MB,File Storage,Storage Team,robert.wilson@company.com,P3,Storage,Upload,Low,Low,Resolved
+INC-008,2025-09-08,,,Printer not responding,Office printer is not responding to print requests,Print Services,IT Support,tom.anderson@company.com,P4,Hardware,Printer,Low,Low,Open
+INC-009,2025-09-09,2025-09-09,2025-09-09,Authentication failure,Users unable to authenticate with SSO,Authentication Service,Security Team,amy.clark@company.com,P1,Security,Authentication,High,High,Resolved
+INC-010,2025-09-10,,2025-09-11,Dashboard loading slowly,Dashboard takes more than 30 seconds to load,Analytics Dashboard,Analytics Team,kevin.miller@company.com,P2,Performance,Loading,Medium,Medium,In Progress
+INC-011,2025-09-11,2025-09-11,,Memory leak in application,Application consuming excessive memory over time,Web Application,Development Team,alex.turner@company.com,P1,Application,Memory,High,High,Resolved
+INC-012,2025-09-12,,,Disk space full,Server disk space reaching capacity,File Server,Storage Team,maria.garcia@company.com,P3,Storage,Disk,Low,Low,Open
+INC-013,2025-09-13,2025-09-13,2025-09-13,VPN connection issues,Remote users unable to connect via VPN,VPN Service,Network Team,james.wilson@company.com,P2,Network,VPN,Medium,Medium,Resolved
+INC-014,2025-09-14,,2025-09-15,Mobile app crashes,Mobile application crashing on certain devices,Mobile App,Mobile Team,sophia.lee@company.com,P1,Application,Crash,High,High,In Progress
+INC-015,2025-09-15,2025-09-15,,Slow database queries,Database queries taking longer than expected,Database Service,DBA Team,daniel.martinez@company.com,P2,Database,Performance,Medium,Medium,Resolved
+INC-016,2025-09-16,,,Backup failure,Automated backup process failing,Backup System,IT Support,emma.thomas@company.com,P4,Infrastructure,Backup,Low,Low,Open
+INC-017,2025-09-17,2025-09-17,2025-09-17,Email attachment blocked,Email attachments being blocked by security filters,Email Service,Security Team,william.jackson@company.com,P3,Email,Security,Low,Low,Resolved
+INC-018,2025-09-18,,2025-09-19,User interface freeze,Web interface freezing during data entry,User Portal,Development Team,olivia.white@company.com,P2,Application,UI,Medium,Medium,In Progress
+INC-019,2025-09-19,2025-09-19,,API rate limiting,API endpoints hitting rate limits,API Gateway,API Team,liam.harris@company.com,P3,Performance,Rate Limiting,Low,Low,Resolved
+INC-020,2025-09-20,,,Certificate expiration,SSL certificate expiring soon,Web Server,Security Team,isabella.clark@company.com,P4,Security,Certificate,Low,Low,Open
+INC-021,2025-09-01,2025-09-01,2025-09-01,Server downtime,Web server experiencing unexpected downtime,Web Server,IT Support,mason.lee@company.com,P1,Infrastructure,Downtime,High,High,Resolved
+INC-022,2025-09-02,,2025-09-03,Login page slow,Login page taking too long to load,User Portal,Development Team,ava.walker@company.com,P2,Performance,Loading,Medium,Medium,In Progress
+INC-023,2025-09-03,2025-09-03,,Report generation fails,Reports not generating properly,Analytics Dashboard,Analytics Team,james.hall@company.com,P3,Application,Reports,Low,Low,Resolved
+INC-024,2025-09-04,,,Notification emails not sent,Email notifications not being sent to users,Notification Service,Email Team,charlotte.young@company.com,P4,Email,Notifications,Low,Low,Open
+INC-025,2025-09-05,2025-09-05,2025-09-05,Data synchronization issues,Data not synchronizing between systems,Data Sync Service,Integration Team,benjamin.king@company.com,P1,Integration,Sync,High,High,Resolved
+INC-026,2025-09-06,,2025-09-07,Password reset not working,Users unable to reset passwords,Authentication Service,Security Team,amelia.scott@company.com,P2,Security,Password,Medium,Medium,In Progress
+INC-027,2025-09-07,2025-09-07,,File permission errors,Users receiving permission denied errors,File Storage,Storage Team,ethan.green@company.com,P3,Storage,Permissions,Low,Low,Resolved
+INC-028,2025-09-08,,,Printer driver issues,Printers require driver updates,Print Services,IT Support,mia.baker@company.com,P4,Hardware,Drivers,Low,Low,Open
+INC-029,2025-09-09,2025-09-09,2025-09-09,Database backup corruption,Database backup files corrupted,Database Service,DBA Team,logan.carter@company.com,P1,Database,Backup,High,High,Resolved
+INC-030,2025-09-10,,2025-09-11,Mobile app performance,Mobile app performance degradation,Mobile App,Mobile Team,harper.mitchell@company.com,P2,Performance,Mobile,Medium,Medium,In Progress
+INC-031,2025-09-11,2025-09-11,,API documentation outdated,API documentation needs updating,API Gateway,API Team,evelyn.perez@company.com,P3,Documentation,API,Low,Low,Resolved
+INC-032,2025-09-12,,,User account locked,User accounts getting locked unexpectedly,User Management,Security Team,sebastian.roberts@company.com,P4,Security,Accounts,Low,Low,Open
+INC-033,2025-09-13,2025-09-13,2025-09-13,Web service timeout,Web services timing out under load,Web Application,Development Team,aria.turner@company.com,P1,Application,Timeout,High,High,Resolved
+INC-034,2025-09-14,,2025-09-15,Dashboard widgets not loading,Dashboard widgets failing to load,Analytics Dashboard,Analytics Team,matthew.phillips@company.com,P2,Application,Widgets,Medium,Medium,In Progress
+INC-035,2025-09-15,2025-09-15,,Email spam filtering,Spam filtering too aggressive,Email Service,Email Team,ella.campbell@company.com,P3,Email,Spam,Low,Low,Resolved
+INC-036,2025-09-16,,,Network latency,Network experiencing high latency,Network Infrastructure,Network Team,jack.parker@company.com,P4,Network,Latency,Low,Low,Open
+INC-037,2025-09-17,2025-09-17,2025-09-17,Database index fragmentation,Database indexes fragmented affecting performance,Database Service,DBA Team,jackson.evans@company.com,P1,Database,Indexing,High,High,Resolved
+INC-038,2025-09-18,,2025-09-19,Mobile app push notifications,Push notifications not working on mobile app,Mobile App,Mobile Team,scarlett.edwards@company.com,P2,Application,Notifications,Medium,Medium,In Progress
+INC-039,2025-09-19,2025-09-19,,API versioning issues,API version compatibility problems,API Gateway,API Team,lucas.collins@company.com,P3,Integration,API,Low,Low,Resolved
+INC-040,2025-09-20,,,User session timeout,User sessions timing out too quickly,User Portal,Security Team,chloe.stewart@company.com,P4,Security,Sessions,Low,Low,Open

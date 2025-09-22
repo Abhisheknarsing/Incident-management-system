@@ -14,8 +14,8 @@ import (
 type JobType string
 
 const (
-	JobTypeProcessUpload     JobType = "process_upload"
-	JobTypeSentimentAnalysis JobType = "sentiment_analysis"
+	JobTypeProcessUpload      JobType = "process_upload"
+	JobTypeSentimentAnalysis  JobType = "sentiment_analysis"
 	JobTypeAutomationAnalysis JobType = "automation_analysis"
 )
 
@@ -57,7 +57,7 @@ type JobQueue struct {
 	ctx         context.Context
 	cancel      context.CancelFunc
 	wg          sync.WaitGroup
-	
+
 	// Services for job processing
 	processingService *ProcessingService
 	sentimentService  SentimentAnalyzer
@@ -73,7 +73,7 @@ type JobQueueConfig struct {
 // NewJobQueue creates a new job queue instance
 func NewJobQueue(config JobQueueConfig, processingService *ProcessingService) *JobQueue {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	if config.Workers <= 0 {
 		config.Workers = 3 // Default to 3 workers
 	}
@@ -176,12 +176,16 @@ func (jq *JobQueue) startWorkers() {
 // worker processes jobs from the queue
 func (jq *JobQueue) worker(workerID int) {
 	defer jq.wg.Done()
-	
+
 	log.Printf("Worker %d started", workerID)
-	
+
 	for {
 		select {
 		case job := <-jq.jobs:
+			// Check if job is nil (shouldn't happen but let's be safe)
+			if job == nil {
+				continue
+			}
 			jq.processJob(workerID, job)
 		case <-jq.ctx.Done():
 			log.Printf("Worker %d shutting down", workerID)
@@ -192,24 +196,45 @@ func (jq *JobQueue) worker(workerID int) {
 
 // processJob processes a single job
 func (jq *JobQueue) processJob(workerID int, job *Job) {
-	log.Printf("Worker %d processing job %s (%s) for upload %s", 
+	// Safety check for nil job
+	if job == nil {
+		log.Printf("Worker %d received nil job, skipping", workerID)
+		return
+	}
+
+	log.Printf("Worker %d processing job %s (%s) for upload %s",
 		workerID, job.ID, job.Type, job.UploadID)
 
 	// Update job status to running
 	jq.updateJobStatus(job, JobStatusRunning, 0, "Processing started")
-	
+
 	startTime := time.Now()
 	job.StartedAt = &startTime
 
 	var err error
-	
+
 	// Process based on job type
 	switch job.Type {
 	case JobTypeProcessUpload:
+		// Check if processing service is available
+		if jq.processingService == nil {
+			err = fmt.Errorf("processing service not available")
+			break
+		}
 		err = jq.processUploadJob(job)
 	case JobTypeSentimentAnalysis:
+		// Check if sentiment service is available
+		if jq.sentimentService == nil {
+			err = fmt.Errorf("sentiment analysis service not available")
+			break
+		}
 		err = jq.processSentimentAnalysisJob(job)
 	case JobTypeAutomationAnalysis:
+		// Check if automation service is available
+		if jq.automationService == nil {
+			err = fmt.Errorf("automation analysis service not available")
+			break
+		}
 		err = jq.processAutomationAnalysisJob(job)
 	default:
 		err = fmt.Errorf("unknown job type: %s", job.Type)
@@ -279,12 +304,12 @@ func (jq *JobQueue) processSentimentAnalysisJob(job *Job) error {
 		}
 
 		batch := incidents[i:end]
-		
+
 		// Analyze sentiment for batch
 		for j := range batch {
 			result, err := jq.sentimentService.AnalyzeSentiment(batch[j].Description)
 			if err != nil {
-				log.Printf("Warning: Failed to analyze sentiment for incident %s: %v", 
+				log.Printf("Warning: Failed to analyze sentiment for incident %s: %v",
 					batch[j].IncidentID, err)
 				continue
 			}
@@ -301,8 +326,8 @@ func (jq *JobQueue) processSentimentAnalysisJob(job *Job) error {
 		}
 
 		processedCount += len(batch)
-		progress := int(float64(processedCount) / float64(totalIncidents) * 90) + 10
-		jq.updateJobStatus(job, JobStatusRunning, progress, 
+		progress := int(float64(processedCount)/float64(totalIncidents)*90) + 10
+		jq.updateJobStatus(job, JobStatusRunning, progress,
 			fmt.Sprintf("Processed sentiment for %d/%d incidents", processedCount, totalIncidents))
 	}
 
@@ -346,12 +371,12 @@ func (jq *JobQueue) processAutomationAnalysisJob(job *Job) error {
 		}
 
 		batch := incidents[i:end]
-		
+
 		// Analyze automation potential for batch
 		for j := range batch {
 			result, err := jq.automationService.AnalyzeAutomation(&batch[j])
 			if err != nil {
-				log.Printf("Warning: Failed to analyze automation for incident %s: %v", 
+				log.Printf("Warning: Failed to analyze automation for incident %s: %v",
 					batch[j].IncidentID, err)
 				continue
 			}
@@ -369,8 +394,8 @@ func (jq *JobQueue) processAutomationAnalysisJob(job *Job) error {
 		}
 
 		processedCount += len(batch)
-		progress := int(float64(processedCount) / float64(totalIncidents) * 90) + 10
-		jq.updateJobStatus(job, JobStatusRunning, progress, 
+		progress := int(float64(processedCount)/float64(totalIncidents)*90) + 10
+		jq.updateJobStatus(job, JobStatusRunning, progress,
 			fmt.Sprintf("Processed automation analysis for %d/%d incidents", processedCount, totalIncidents))
 	}
 
@@ -398,34 +423,34 @@ func (jq *JobQueue) updateJobStatus(job *Job, status JobStatus, progress int, me
 func (jq *JobQueue) completeJob(job *Job) {
 	completedAt := time.Now()
 	job.CompletedAt = &completedAt
-	
+
 	jq.updateJobStatus(job, JobStatusCompleted, 100, "Job completed successfully")
-	
+
 	log.Printf("Job %s completed successfully for upload %s", job.ID, job.UploadID)
 }
 
 // handleJobError handles job errors and implements retry logic
 func (jq *JobQueue) handleJobError(job *Job, err error) {
 	job.Error = err.Error()
-	
+
 	log.Printf("Job %s failed: %v (retry %d/%d)", job.ID, err, job.RetryCount, job.MaxRetries)
 
 	// Check if we should retry
 	if job.RetryCount < job.MaxRetries {
 		job.RetryCount++
-		jq.updateJobStatus(job, JobStatusRetrying, job.Progress, 
+		jq.updateJobStatus(job, JobStatusRetrying, job.Progress,
 			fmt.Sprintf("Retrying job (attempt %d/%d): %v", job.RetryCount, job.MaxRetries, err))
 
 		// Exponential backoff for retry
 		retryDelay := time.Duration(job.RetryCount*job.RetryCount) * time.Second
-		
+
 		go func() {
 			time.Sleep(retryDelay)
-			
+
 			// Reset job for retry
 			job.Status = JobStatusPending
 			job.Error = ""
-			
+
 			// Resubmit to queue
 			select {
 			case jq.jobs <- job:
@@ -441,7 +466,7 @@ func (jq *JobQueue) handleJobError(job *Job, err error) {
 		// Max retries exceeded
 		completedAt := time.Now()
 		job.CompletedAt = &completedAt
-		jq.updateJobStatus(job, JobStatusFailed, job.Progress, 
+		jq.updateJobStatus(job, JobStatusFailed, job.Progress,
 			fmt.Sprintf("Job failed after %d retries: %v", job.MaxRetries, err))
 	}
 }
@@ -449,15 +474,15 @@ func (jq *JobQueue) handleJobError(job *Job, err error) {
 // Shutdown gracefully shuts down the job queue
 func (jq *JobQueue) Shutdown() {
 	log.Println("Shutting down job queue...")
-	
+
 	jq.cancel()
-	
+
 	// Close the jobs channel to signal workers to stop
 	close(jq.jobs)
-	
+
 	// Wait for all workers to finish
 	jq.wg.Wait()
-	
+
 	log.Println("Job queue shutdown complete")
 }
 
@@ -472,21 +497,21 @@ func generateJobID() string {
 func (jq *JobQueue) updateIncidentsSentiment(incidents []models.Incident) error {
 	// This would typically be implemented in the incident service
 	// For now, we'll implement a simple batch update
-	
+
 	for _, incident := range incidents {
 		query := `
 			UPDATE incidents 
 			SET sentiment_score = ?, sentiment_label = ?, updated_at = ?
 			WHERE id = ?
 		`
-		
+
 		_, err := jq.processingService.db.ExecContext(jq.ctx, query,
 			incident.SentimentScore, incident.SentimentLabel, time.Now(), incident.ID)
 		if err != nil {
 			return fmt.Errorf("failed to update sentiment for incident %s: %w", incident.ID, err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -494,21 +519,21 @@ func (jq *JobQueue) updateIncidentsSentiment(incidents []models.Incident) error 
 func (jq *JobQueue) updateIncidentsAutomation(incidents []models.Incident) error {
 	// This would typically be implemented in the incident service
 	// For now, we'll implement a simple batch update
-	
+
 	for _, incident := range incidents {
 		query := `
 			UPDATE incidents 
 			SET automation_score = ?, automation_feasible = ?, it_process_group = ?, updated_at = ?
 			WHERE id = ?
 		`
-		
+
 		_, err := jq.processingService.db.ExecContext(jq.ctx, query,
-			incident.AutomationScore, incident.AutomationFeasible, incident.ITProcessGroup, 
+			incident.AutomationScore, incident.AutomationFeasible, incident.ITProcessGroup,
 			time.Now(), incident.ID)
 		if err != nil {
 			return fmt.Errorf("failed to update automation data for incident %s: %w", incident.ID, err)
 		}
 	}
-	
+
 	return nil
 }

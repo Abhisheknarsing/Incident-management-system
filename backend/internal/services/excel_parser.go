@@ -1,40 +1,61 @@
 package services
 
 import (
+	"context"
 	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"incident-management-system/internal/models"
 
-	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
 )
 
-// ExcelParser handles Excel file parsing and validation
+// ExcelParser handles parsing of Excel files with concurrent processing
 type ExcelParser struct {
-	// Column mappings for flexible Excel formats
-	columnMappings map[string]string
+	maxWorkers int
+	batchSize  int
 }
 
-// NewExcelParser creates a new ExcelParser instance
-func NewExcelParser() *ExcelParser {
-	return &ExcelParser{
-		columnMappings: getDefaultColumnMappings(),
+// ExcelParserConfig holds configuration for the Excel parser
+type ExcelParserConfig struct {
+	MaxWorkers int // Maximum number of concurrent workers
+	BatchSize  int // Number of rows to process in each batch
+}
+
+// DefaultExcelParserConfig returns default configuration
+func DefaultExcelParserConfig() *ExcelParserConfig {
+	return &ExcelParserConfig{
+		MaxWorkers: runtime.NumCPU(), // Use all available CPU cores
+		BatchSize:  100,              // Process 100 rows per batch
 	}
 }
 
-// ParseResult represents the result of parsing an Excel file
-type ParseResult struct {
-	Incidents []models.Incident      `json:"incidents"`
-	Errors    []models.ValidationError `json:"errors"`
-	TotalRows int                    `json:"total_rows"`
-	ValidRows int                    `json:"valid_rows"`
+// NewExcelParser creates a new Excel parser with the given configuration
+func NewExcelParser(config *ExcelParserConfig) *ExcelParser {
+	if config == nil {
+		config = DefaultExcelParserConfig()
+	}
+
+	// Ensure reasonable limits
+	if config.MaxWorkers <= 0 {
+		config.MaxWorkers = 1
+	}
+	if config.BatchSize <= 0 {
+		config.BatchSize = 10
+	}
+
+	return &ExcelParser{
+		maxWorkers: config.MaxWorkers,
+		batchSize:  config.BatchSize,
+	}
 }
 
-// ParseExcelFile parses an Excel file and returns incidents with validation errors
-func (p *ExcelParser) ParseExcelFile(filePath, uploadID string) (*ParseResult, error) {
+// ParseFile parses an Excel file and returns incidents with concurrent processing
+func (p *ExcelParser) ParseFile(ctx context.Context, filePath string) ([]models.Incident, error) {
 	// Open Excel file
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
@@ -42,310 +63,273 @@ func (p *ExcelParser) ParseExcelFile(filePath, uploadID string) (*ParseResult, e
 	}
 	defer f.Close()
 
-	// Get the first worksheet
-	sheetName := f.GetSheetName(0)
-	if sheetName == "" {
-		return nil, fmt.Errorf("no worksheets found in Excel file")
-	}
-
-	// Get all rows from the worksheet
-	rows, err := f.GetRows(sheetName)
+	// Get all rows from the first sheet
+	rows, err := f.GetRows("Sheet1")
 	if err != nil {
-		return nil, fmt.Errorf("failed to read rows from worksheet: %w", err)
-	}
-
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("worksheet is empty")
-	}
-
-	// Parse header row to determine column positions
-	headerRow := rows[0]
-	columnMap, err := p.mapColumns(headerRow)
-	if err != nil {
-		return nil, fmt.Errorf("failed to map columns: %w", err)
-	}
-
-	// Validate required columns are present
-	if err := p.validateRequiredColumns(columnMap); err != nil {
-		return nil, err
-	}
-
-	result := &ParseResult{
-		Incidents: make([]models.Incident, 0),
-		Errors:    make([]models.ValidationError, 0),
-		TotalRows: len(rows) - 1, // Exclude header row
-		ValidRows: 0,
-	}
-
-	// Process data rows
-	for rowIndex, row := range rows[1:] { // Skip header row
-		rowNumber := rowIndex + 2 // Excel row numbers start at 1, plus header
-
-		incident, validationErrors := p.parseRow(row, columnMap, uploadID, rowNumber)
-		
-		if len(validationErrors) > 0 {
-			result.Errors = append(result.Errors, validationErrors...)
-		} else {
-			result.Incidents = append(result.Incidents, *incident)
-			result.ValidRows++
+		// Try to get rows from the first available sheet
+		sheets := f.GetSheetList()
+		if len(sheets) == 0 {
+			return nil, fmt.Errorf("no sheets found in Excel file")
+		}
+		rows, err = f.GetRows(sheets[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to read rows from sheet: %w", err)
 		}
 	}
 
-	return result, nil
+	// Check if we have data
+	if len(rows) <= 1 {
+		return []models.Incident{}, nil
+	}
+
+	// Parse header row to get column indices
+	header := rows[0]
+	columnIndices := p.parseHeader(header)
+
+	// Process data rows concurrently
+	dataRows := rows[1:]
+	incidents, err := p.processRowsConcurrently(ctx, dataRows, columnIndices)
+	if err != nil {
+		return nil, fmt.Errorf("failed to process rows: %w", err)
+	}
+
+	return incidents, nil
 }
 
-// mapColumns maps Excel column headers to internal field names
-func (p *ExcelParser) mapColumns(headerRow []string) (map[string]int, error) {
-	columnMap := make(map[string]int)
-	
-	for i, header := range headerRow {
-		normalizedHeader := p.normalizeColumnName(header)
-		
-		// Check if this header matches any of our expected columns
-		for fieldName, expectedHeader := range p.columnMappings {
-			if normalizedHeader == p.normalizeColumnName(expectedHeader) {
-				columnMap[fieldName] = i
-				break
+// parseHeader maps column names to indices
+func (p *ExcelParser) parseHeader(header []string) map[string]int {
+	indices := make(map[string]int)
+
+	// Define expected column names and their mappings
+	columnMappings := map[string][]string{
+		"incident_id":         {"incidentid", "incidentid", "id", "ticketid", "ticketid"},
+		"application_name":    {"applicationname", "applicationname", "app", "application"},
+		"report_date":         {"reportdate", "reportdate", "date", "createddate", "createddate"},
+		"priority":            {"priority", "prio", "severity"},
+		"status":              {"status", "state"},
+		"resolved_person":     {"resolvedperson", "resolver", "resolvedby", "resolvedby"},
+		"resolve_date":        {"resolvedate", "resolvedate", "resolveddate", "resolveddate"},
+		"brief_description":   {"briefdescription", "description", "desc", "summary"},
+		"resolution_group":    {"resolutiongroup", "assignee", "assignedto", "assignedto"},
+		"it_process_group":    {"itprocessgroup", "itprocessgroup", "processgroup", "processgroup"},
+		"automation_feasible": {"automationfeasible", "automationfeasible", "automatable"},
+		"automation_score":    {"automationscore", "automationscore"},
+		"sentiment_label":     {"sentimentlabel", "sentimentlabel", "sentiment"},
+		"sentiment_score":     {"sentimentscore", "sentimentscore"},
+		"closure_code":        {"closurecode", "closurecode", "closecode", "closecode"},
+	}
+
+	// Map header columns to expected fields
+	for i, columnName := range header {
+		// Normalize column name (lowercase, remove spaces)
+		normalized := normalizeColumnName(columnName)
+
+		// Find matching field
+		for field, possibleNames := range columnMappings {
+			for _, possibleName := range possibleNames {
+				if normalized == possibleName {
+					indices[field] = i
+					break
+				}
 			}
 		}
 	}
 
-	return columnMap, nil
+	return indices
 }
 
-// normalizeColumnName normalizes column names for comparison
-func (p *ExcelParser) normalizeColumnName(name string) string {
-	// Convert to lowercase and remove spaces, underscores, and special characters
-	normalized := strings.ToLower(name)
-	normalized = strings.ReplaceAll(normalized, " ", "")
-	normalized = strings.ReplaceAll(normalized, "_", "")
-	normalized = strings.ReplaceAll(normalized, "-", "")
-	return normalized
+// normalizeColumnName normalizes column names for matching
+func normalizeColumnName(name string) string {
+	// Convert to lowercase and remove spaces, underscores, hyphens
+	result := ""
+	for _, r := range name {
+		if r != ' ' && r != '_' && r != '-' {
+			result += string(r)
+		}
+	}
+	return strings.ToLower(result)
 }
 
-// validateRequiredColumns ensures all required columns are present
-func (p *ExcelParser) validateRequiredColumns(columnMap map[string]int) error {
-	requiredFields := []string{
-		"incident_id", "report_date", "brief_description", 
-		"application_name", "resolution_group", "resolved_person", "priority",
+// processRowsConcurrently processes rows using concurrent workers
+func (p *ExcelParser) processRowsConcurrently(ctx context.Context, rows [][]string, columnIndices map[string]int) ([]models.Incident, error) {
+	// Create channels for work distribution and results collection
+	type workItem struct {
+		index int
+		row   []string
 	}
 
-	var missingFields []string
-	for _, field := range requiredFields {
-		if _, exists := columnMap[field]; !exists {
-			missingFields = append(missingFields, field)
+	workChan := make(chan workItem, len(rows))
+	resultsChan := make(chan struct {
+		index    int
+		incident models.Incident
+		err      error
+	}, len(rows))
+
+	// Create worker pool
+	var wg sync.WaitGroup
+	workerCount := p.maxWorkers
+	if workerCount > len(rows) {
+		workerCount = len(rows)
+	}
+
+	// Start workers
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case work, ok := <-workChan:
+					if !ok {
+						return // Channel closed
+					}
+
+					// Process the row
+					incident, err := p.parseRow(work.row, columnIndices)
+					resultsChan <- struct {
+						index    int
+						incident models.Incident
+						err      error
+					}{work.index, incident, err}
+
+				case <-ctx.Done():
+					return // Context cancelled
+				}
+			}
+		}()
+	}
+
+	// Send work to workers
+	go func() {
+		defer close(workChan)
+		for i, row := range rows {
+			select {
+			case workChan <- workItem{index: i, row: row}:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// Close results channel when all workers are done
+	go func() {
+		wg.Wait()
+		close(resultsChan)
+	}()
+
+	// Collect results
+	incidents := make([]models.Incident, len(rows))
+	var firstError error
+
+	for result := range resultsChan {
+		if result.err != nil {
+			if firstError == nil {
+				firstError = result.err
+			}
+			continue
+		}
+		incidents[result.index] = result.incident
+	}
+
+	// Filter out zero-value incidents (failed parses)
+	filtered := make([]models.Incident, 0, len(incidents))
+	for _, incident := range incidents {
+		if incident.IncidentID != "" {
+			filtered = append(filtered, incident)
 		}
 	}
 
-	if len(missingFields) > 0 {
-		return fmt.Errorf("missing required columns: %s", strings.Join(missingFields, ", "))
+	if firstError != nil {
+		return filtered, firstError
 	}
 
-	return nil
+	return filtered, nil
 }
 
-// parseRow parses a single Excel row into an Incident
-func (p *ExcelParser) parseRow(row []string, columnMap map[string]int, uploadID string, rowNumber int) (*models.Incident, []models.ValidationError) {
-	incident := &models.Incident{
-		ID:       uuid.New().String(),
-		UploadID: uploadID,
-	}
-
-	var errors []models.ValidationError
-
-	// Parse required fields
-	if col, exists := columnMap["incident_id"]; exists && col < len(row) {
-		incident.IncidentID = strings.TrimSpace(row[col])
-	}
-
-	if col, exists := columnMap["brief_description"]; exists && col < len(row) {
-		incident.BriefDescription = strings.TrimSpace(row[col])
-	}
-
-	if col, exists := columnMap["application_name"]; exists && col < len(row) {
-		incident.ApplicationName = strings.TrimSpace(row[col])
-	}
-
-	if col, exists := columnMap["resolution_group"]; exists && col < len(row) {
-		incident.ResolutionGroup = strings.TrimSpace(row[col])
-	}
-
-	if col, exists := columnMap["resolved_person"]; exists && col < len(row) {
-		incident.ResolvedPerson = strings.TrimSpace(row[col])
-	}
-
-	if col, exists := columnMap["priority"]; exists && col < len(row) {
-		incident.Priority = strings.TrimSpace(row[col])
-	}
-
-	// Parse dates
-	if col, exists := columnMap["report_date"]; exists && col < len(row) {
-		if date, err := p.parseDate(row[col]); err != nil {
-			errors = append(errors, models.ValidationError{
-				Field:   "report_date",
-				Value:   row[col],
-				Message: fmt.Sprintf("invalid date format: %v", err),
-				Row:     rowNumber,
-			})
-		} else {
-			incident.ReportDate = date
-		}
-	}
-
-	if col, exists := columnMap["resolve_date"]; exists && col < len(row) && strings.TrimSpace(row[col]) != "" {
-		if date, err := p.parseDate(row[col]); err != nil {
-			errors = append(errors, models.ValidationError{
-				Field:   "resolve_date",
-				Value:   row[col],
-				Message: fmt.Sprintf("invalid date format: %v", err),
-				Row:     rowNumber,
-			})
-		} else {
-			incident.ResolveDate = &date
-		}
-	}
-
-	if col, exists := columnMap["last_resolve_date"]; exists && col < len(row) && strings.TrimSpace(row[col]) != "" {
-		if date, err := p.parseDate(row[col]); err != nil {
-			errors = append(errors, models.ValidationError{
-				Field:   "last_resolve_date",
-				Value:   row[col],
-				Message: fmt.Sprintf("invalid date format: %v", err),
-				Row:     rowNumber,
-			})
-		} else {
-			incident.LastResolveDate = &date
-		}
-	}
-
-	// Parse optional fields
-	if col, exists := columnMap["description"]; exists && col < len(row) {
-		incident.Description = strings.TrimSpace(row[col])
-	}
-
-	if col, exists := columnMap["category"]; exists && col < len(row) {
-		incident.Category = strings.TrimSpace(row[col])
-	}
-
-	if col, exists := columnMap["subcategory"]; exists && col < len(row) {
-		incident.Subcategory = strings.TrimSpace(row[col])
-	}
-
-	if col, exists := columnMap["impact"]; exists && col < len(row) {
-		incident.Impact = strings.TrimSpace(row[col])
-	}
-
-	if col, exists := columnMap["urgency"]; exists && col < len(row) {
-		incident.Urgency = strings.TrimSpace(row[col])
-	}
-
-	if col, exists := columnMap["status"]; exists && col < len(row) {
-		incident.Status = strings.TrimSpace(row[col])
-	}
-
-	if col, exists := columnMap["customer_affected"]; exists && col < len(row) {
-		incident.CustomerAffected = strings.TrimSpace(row[col])
-	}
-
-	if col, exists := columnMap["business_service"]; exists && col < len(row) {
-		incident.BusinessService = strings.TrimSpace(row[col])
-	}
-
-	if col, exists := columnMap["root_cause"]; exists && col < len(row) {
-		incident.RootCause = strings.TrimSpace(row[col])
-	}
-
-	if col, exists := columnMap["resolution_notes"]; exists && col < len(row) {
-		incident.ResolutionNotes = strings.TrimSpace(row[col])
-	}
-
-	// Calculate resolution time if both dates are available
-	incident.CalculateResolutionTime()
-
-	// Set defaults
+// parseRow parses a single row into an Incident model
+func (p *ExcelParser) parseRow(row []string, columnIndices map[string]int) (models.Incident, error) {
+	incident := models.Incident{}
 	incident.SetDefaults()
 
-	// Validate the incident
-	if validationErr := incident.ValidateForRow(rowNumber); validationErr != nil {
-		if validationErrors, ok := validationErr.(models.ValidationErrors); ok {
-			errors = append(errors, validationErrors...)
-		} else {
-			errors = append(errors, models.ValidationError{
-				Field:   "general",
-				Value:   "",
-				Message: validationErr.Error(),
-				Row:     rowNumber,
-			})
+	// Helper function to safely get cell value
+	getCellValue := func(fieldName string) string {
+		if index, exists := columnIndices[fieldName]; exists && index < len(row) {
+			return row[index]
+		}
+		return ""
+	}
+
+	// Parse required fields
+	incident.IncidentID = getCellValue("incident_id")
+	if incident.IncidentID == "" {
+		return models.Incident{}, fmt.Errorf("missing required field: incident_id")
+	}
+
+	incident.ApplicationName = getCellValue("application_name")
+	incident.BriefDescription = getCellValue("brief_description")
+	incident.ResolutionGroup = getCellValue("resolution_group")
+	incident.ResolvedPerson = getCellValue("resolved_person")
+	incident.Priority = getCellValue("priority")
+	incident.Status = getCellValue("status")
+	incident.ITProcessGroup = getCellValue("it_process_group")
+	incident.SentimentLabel = getCellValue("sentiment_label")
+
+	// Parse date fields
+	if dateStr := getCellValue("report_date"); dateStr != "" {
+		if parsedDate, err := parseDate(dateStr); err == nil {
+			incident.ReportDate = parsedDate
 		}
 	}
 
-	return incident, errors
+	if dateStr := getCellValue("resolve_date"); dateStr != "" {
+		if parsedDate, err := parseDate(dateStr); err == nil {
+			incident.ResolveDate = &parsedDate
+		}
+	}
+
+	// Parse numeric fields
+	if scoreStr := getCellValue("automation_score"); scoreStr != "" {
+		if score, err := strconv.ParseFloat(scoreStr, 64); err == nil {
+			incident.AutomationScore = &score
+		}
+	}
+
+	if scoreStr := getCellValue("sentiment_score"); scoreStr != "" {
+		if score, err := strconv.ParseFloat(scoreStr, 64); err == nil {
+			incident.SentimentScore = &score
+		}
+	}
+
+	// Parse boolean fields
+	if feasibleStr := getCellValue("automation_feasible"); feasibleStr != "" {
+		feasible := feasibleStr == "true" || feasibleStr == "1" || feasibleStr == "yes"
+		incident.AutomationFeasible = &feasible
+	}
+
+	return incident, nil
 }
 
-// parseDate parses various date formats commonly found in Excel files
-func (p *ExcelParser) parseDate(dateStr string) (time.Time, error) {
-	dateStr = strings.TrimSpace(dateStr)
-	if dateStr == "" {
-		return time.Time{}, fmt.Errorf("empty date string")
-	}
-
-	// Common date formats
+// parseDate attempts to parse a date string in various formats
+func parseDate(dateStr string) (time.Time, error) {
+	// Try common date formats
 	formats := []string{
-		"2006-01-02",           // ISO format
-		"01/02/2006",           // US format
-		"02/01/2006",           // European format
-		"2006/01/02",           // Alternative ISO
-		"01-02-2006",           // US with dashes
-		"02-01-2006",           // European with dashes
-		"2006-01-02 15:04:05",  // ISO with time
-		"01/02/2006 15:04:05",  // US with time
-		"02/01/2006 15:04:05",  // European with time
+		"2006-01-02",
+		"01/02/2006",
+		"02/01/2006",
+		"2006/01/02",
+		"01-02-2006",
+		"02-01-2006",
+		"2006-01-02 15:04:05",
+		"01/02/2006 15:04:05",
+		time.RFC3339,
+		time.RFC822,
 	}
 
-	// Try parsing as Excel serial number first
-	if serialNum, err := strconv.ParseFloat(dateStr, 64); err == nil {
-		// Excel serial date (days since 1900-01-01, with some quirks)
-		if serialNum > 0 {
-			// Excel incorrectly treats 1900 as a leap year, so we need to adjust
-			baseDate := time.Date(1899, 12, 30, 0, 0, 0, 0, time.UTC)
-			return baseDate.AddDate(0, 0, int(serialNum)), nil
-		}
-	}
-
-	// Try each format
 	for _, format := range formats {
-		if date, err := time.Parse(format, dateStr); err == nil {
-			return date, nil
+		if parsedDate, err := time.Parse(format, dateStr); err == nil {
+			return parsedDate, nil
 		}
 	}
 
 	return time.Time{}, fmt.Errorf("unable to parse date: %s", dateStr)
-}
-
-// getDefaultColumnMappings returns the default column name mappings
-func getDefaultColumnMappings() map[string]string {
-	return map[string]string{
-		// Required fields
-		"incident_id":        "Incident ID",
-		"report_date":        "Report Date",
-		"brief_description":  "Brief Description",
-		"application_name":   "Application Name",
-		"resolution_group":   "Resolution Group",
-		"resolved_person":    "Resolved Person",
-		"priority":           "Priority",
-
-		// Optional fields
-		"resolve_date":       "Resolve Date",
-		"last_resolve_date":  "Last Resolve Date",
-		"description":        "Description",
-		"category":           "Category",
-		"subcategory":        "Subcategory",
-		"impact":             "Impact",
-		"urgency":            "Urgency",
-		"status":             "Status",
-		"customer_affected":  "Customer Affected",
-		"business_service":   "Business Service",
-		"root_cause":         "Root Cause",
-		"resolution_notes":   "Resolution Notes",
-	}
 }

@@ -36,7 +36,14 @@ func TestProcessingService_ProcessIncidentsWithAnalysis(t *testing.T) {
 	fileStore := storage.NewFileStore(tempDir)
 
 	// Create processing service
-	service := NewProcessingService(db, fileStore)
+	service := &ProcessingService{
+		db:                 db,
+		fileStore:          fileStore,
+		excelParser:        NewExcelParser(DefaultExcelParserConfig()),
+		incidentService:    NewIncidentService(db),
+		sentimentAnalyzer:  NewSimpleSentimentAnalyzer(),
+		automationAnalyzer: NewSimpleAutomationAnalyzer(),
+	}
 
 	// Create test incidents
 	incidents := []models.Incident{
@@ -83,7 +90,7 @@ func TestProcessingService_ProcessIncidentsWithAnalysis(t *testing.T) {
 
 	// Verify first incident (should have high automation potential)
 	incident1 := incidents[0]
-	
+
 	// Check resolution time was calculated
 	if incident1.ResolutionTimeHours == nil {
 		t.Errorf("Expected resolution time to be calculated for incident 1")
@@ -120,7 +127,7 @@ func TestProcessingService_ProcessIncidentsWithAnalysis(t *testing.T) {
 
 	// Verify second incident (should have lower automation potential)
 	incident2 := incidents[1]
-	
+
 	// Check resolution time was calculated
 	if incident2.ResolutionTimeHours == nil {
 		t.Errorf("Expected resolution time to be calculated for incident 2")
@@ -198,7 +205,7 @@ func TestProcessingService_ProcessIncidentsWithAnalysis_ErrorHandling(t *testing
 
 	// Verify analysis was attempted
 	incident := incidents[0]
-	
+
 	// Should have some analysis results even with minimal data
 	if incident.ITProcessGroup == "" {
 		t.Errorf("Expected IT process group to be set even with minimal data")
@@ -235,7 +242,7 @@ func TestProcessingService_ProcessIncidentsWithAnalysis_NilAnalyzers(t *testing.
 	service := &ProcessingService{
 		db:                 db,
 		fileStore:          fileStore,
-		excelParser:        NewExcelParser(),
+		excelParser:        NewExcelParser(DefaultExcelParserConfig()),
 		incidentService:    NewIncidentService(db),
 		sentimentAnalyzer:  nil, // Nil analyzer
 		automationAnalyzer: nil, // Nil analyzer
