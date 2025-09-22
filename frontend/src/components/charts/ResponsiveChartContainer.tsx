@@ -1,13 +1,17 @@
 import { ReactNode, useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Maximize2, Minimize2, Download } from 'lucide-react'
+import { ExportButton } from '@/components/export'
+import { FilterState } from '@/types'
+import { Maximize2, Minimize2 } from 'lucide-react'
 
 interface ResponsiveChartContainerProps {
   title: string
   description?: string
   children: ReactNode
   onExport?: () => void
+  exportDataType?: string
+  filters?: Partial<FilterState>
   className?: string
   defaultHeight?: number
   expandedHeight?: number
@@ -18,6 +22,8 @@ export function ResponsiveChartContainer({
   description,
   children,
   onExport,
+  exportDataType,
+  filters = {},
   className = "",
   defaultHeight = 300,
   expandedHeight = 500
@@ -54,15 +60,25 @@ export function ResponsiveChartContainer({
           </div>
           
           <div className="flex items-center gap-2">
-            {onExport && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onExport}
-                className="h-8 w-8 p-0"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
+            {(onExport || exportDataType) && (
+              exportDataType ? (
+                <ExportButton
+                  dataType={exportDataType}
+                  filters={filters}
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2"
+                />
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onExport}
+                  className="h-8 px-2"
+                >
+                  Export
+                </Button>
+              )
             )}
             
             <Button

@@ -9,3 +9,7 @@ export * from './useAppState'
 
 // Export hooks
 export * from './useExport'
+
+// Filter hooks
+export { useFilterState } from './useFilters'
+export * from './useFilterOptions'

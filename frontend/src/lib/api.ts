@@ -127,5 +127,17 @@ export const apiClient = {
       filters?: Record<string, any>
     }): Promise<{ download_url: string; job_id: string }> =>
       api.post('/export', options).then(res => res.data),
+    
+    getStatus: (jobId: string): Promise<{
+      id: string
+      status: 'pending' | 'processing' | 'completed' | 'failed'
+      progress: number
+      download_url?: string
+      error?: string
+    }> =>
+      api.get(`/export/${jobId}/status`).then(res => res.data),
+    
+    download: (downloadUrl: string): Promise<Blob> =>
+      api.get(downloadUrl, { responseType: 'blob' }).then(res => res.data),
   },
 }

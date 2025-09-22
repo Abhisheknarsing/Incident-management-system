@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { 
   TimelineChart, 
@@ -16,6 +15,8 @@ import {
   SentimentScoreCard,
   ActiveApplicationsCard
 } from '@/components/charts'
+import { FilterPanel } from '@/components/filters'
+import { ExportButton } from '@/components/export'
 import { 
   useTimelineData, 
   usePriorityAnalysis, 
@@ -24,13 +25,16 @@ import {
   useSentimentAnalysis,
   useAutomationAnalysis
 } from '@/hooks/useAnalytics'
-import { FilterState } from '@/types'
+import { useFilterState } from '@/hooks/useFilters'
+import { useFilterOptions, useAvailableApplications } from '@/hooks/useFilterOptions'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle } from 'lucide-react'
 
 export function DashboardPage() {
-  const [filters] = useState<Partial<FilterState>>({})
+  const { filters, updateFilters, hasActiveFilters, activeFilterCount } = useFilterState()
+  const { data: filterOptions } = useFilterOptions()
+  const { data: availableApplications } = useAvailableApplications()
   
   const { 
     data: timelineData, 
@@ -68,30 +72,7 @@ export function DashboardPage() {
     error: automationError 
   } = useAutomationAnalysis(filters)
 
-  const handleExportTimeline = () => {
-    // TODO: Implement export functionality
-    console.log('Export timeline data')
-  }
 
-  const handleExportPriority = () => {
-    // TODO: Implement export functionality
-    console.log('Export priority data')
-  }
-
-  const handleExportApplication = () => {
-    // TODO: Implement export functionality
-    console.log('Export application data')
-  }
-
-  const handleExportSentiment = () => {
-    // TODO: Implement export functionality
-    console.log('Export sentiment data')
-  }
-
-  const handleExportAutomation = () => {
-    // TODO: Implement export functionality
-    console.log('Export automation data')
-  }
 
 
 
@@ -109,12 +90,38 @@ export function DashboardPage() {
 
   return (
     <MetricsDashboard className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
-        <p className="text-muted-foreground">
-          View comprehensive incident analytics and reports
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+          <p className="text-muted-foreground">
+            View comprehensive incident analytics and reports
+            {hasActiveFilters && (
+              <span className="ml-2 text-primary">
+                ({activeFilterCount} filter{activeFilterCount !== 1 ? 's' : ''} applied)
+              </span>
+            )}
+          </p>
+        </div>
+        <ExportButton 
+          dataType="all" 
+          filters={filters}
+          variant="default"
+          size="default"
+        >
+          Export Dashboard
+        </ExportButton>
       </div>
+
+      {/* Filter Panel */}
+      <FilterPanel
+        filters={filters}
+        onFiltersChange={updateFilters}
+        availableOptions={{
+          priorities: filterOptions?.priorities || [],
+          applications: availableApplications || [],
+          statuses: filterOptions?.statuses || []
+        }}
+      />
 
       {/* Key Metrics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -175,7 +182,8 @@ export function DashboardPage() {
             <ResponsiveChartContainer
               title="Incident Timeline"
               description="Daily incident counts with priority breakdown"
-              onExport={handleExportTimeline}
+              exportDataType="timeline"
+              filters={filters}
               defaultHeight={300}
               expandedHeight={500}
             >
@@ -226,7 +234,8 @@ export function DashboardPage() {
           <ResponsiveChartContainer
             title="Priority Distribution"
             description="Breakdown by priority levels"
-            onExport={handleExportPriority}
+            exportDataType="priority"
+            filters={filters}
             defaultHeight={350}
             expandedHeight={500}
           >
@@ -275,7 +284,8 @@ export function DashboardPage() {
           <ResponsiveChartContainer
             title="Application Analysis"
             description="Incidents by application with resolution times"
-            onExport={handleExportApplication}
+            exportDataType="application"
+            filters={filters}
             defaultHeight={350}
             expandedHeight={600}
           >
@@ -365,7 +375,8 @@ export function DashboardPage() {
           <ResponsiveChartContainer
             title="Sentiment Analysis"
             description="Incident sentiment breakdown"
-            onExport={handleExportSentiment}
+            exportDataType="sentiment"
+            filters={filters}
             defaultHeight={350}
             expandedHeight={500}
           >
@@ -412,7 +423,8 @@ export function DashboardPage() {
           <ResponsiveChartContainer
             title="Automation Opportunities"
             description="Process automation potential"
-            onExport={handleExportAutomation}
+            exportDataType="automation"
+            filters={filters}
             defaultHeight={350}
             expandedHeight={600}
           >
