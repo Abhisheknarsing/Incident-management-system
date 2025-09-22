@@ -22,7 +22,8 @@ interface MemoryInfo {
   jsHeapSizeLimit: number
 }
 
-export function usePerformanceOptimization(config: Partial<OptimizationConfig> = {}) {
+export function usePerformanceOptimization(config?: Partial<OptimizationConfig>) {
+  const frameRef = useRef<number>()
   const [metrics, setMetrics] = useState<PerformanceMetrics>({
     memoryUsage: 0,
     cpuUsage: 0,
@@ -33,8 +34,6 @@ export function usePerformanceOptimization(config: Partial<OptimizationConfig> =
   
   const [isOptimized, setIsOptimized] = useState(false)
   const [optimizationSuggestions, setOptimizationSuggestions] = useState<string[]>([])
-  const animationFrameRef = useRef<number>()
-  const lastFrameTimeRef = useRef<number>(0)
   const frameCountRef = useRef<number>(0)
   const lastFpsUpdateRef = useRef<number>(0)
 
@@ -60,14 +59,20 @@ export function usePerformanceOptimization(config: Partial<OptimizationConfig> =
       lastFpsUpdateRef.current = now
     }
     
-    animationFrameRef.current = requestAnimationFrame(calculateFps)
+    frameRef.current = requestAnimationFrame(calculateFps)
+  }, [])
+
+  const cancelOptimization = useCallback(() => {
+    if (frameRef.current) {
+      cancelAnimationFrame(frameRef.current)
+    }
   }, [])
 
   // Monitor performance metrics
   useEffect(() => {
     // Start FPS monitoring
     lastFpsUpdateRef.current = performance.now()
-    animationFrameRef.current = requestAnimationFrame(calculateFps)
+    frameRef.current = requestAnimationFrame(calculateFps)
     
     // Memory usage monitoring (if available)
     const monitorMemory = () => {
@@ -87,9 +92,7 @@ export function usePerformanceOptimization(config: Partial<OptimizationConfig> =
     monitorMemory()
     
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current)
-      }
+      cancelOptimization()
       clearInterval(memoryInterval)
     }
   }, [calculateFps])

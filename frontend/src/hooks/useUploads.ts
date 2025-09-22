@@ -11,7 +11,7 @@ export const QUERY_KEYS = {
 export function useUploads() {
   const { handleError } = useErrorHandler()
   
-  return useQuery({
+  return useQuery<Upload[]>({
     queryKey: QUERY_KEYS.uploads,
     queryFn: apiClient.uploads.list,
     staleTime: 1000 * 60 * 2, // 2 minutes
@@ -30,10 +30,17 @@ export function useUploadFile(onProgress?: (progress: number) => void) {
     mutationFn: (file: File) => apiClient.uploads.upload(file, onProgress),
     onSuccess: (newUpload: Upload) => {
       // Update the uploads list with the new upload
-      queryClient.setQueryData(QUERY_KEYS.uploads, (old: Upload[] = []) => [
-        newUpload,
-        ...old,
-      ])
+      queryClient.setQueryData<Upload[]>(QUERY_KEYS.uploads, (old: Upload[] | undefined) => {
+        // Handle case where old data might be undefined or null
+        if (!old) {
+          return [newUpload]
+        }
+        // Ensure old is actually an array before spreading
+        if (!Array.isArray(old)) {
+          return [newUpload]
+        }
+        return [newUpload, ...old]
+      })
     },
     onError: (error) => {
       handleError(error, 'File upload failed')

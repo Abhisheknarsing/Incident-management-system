@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react'
+import { Component, ErrorInfo, ReactNode } from 'react'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { ErrorInfo as ErrorInfoType } from '@/lib/errors'
@@ -6,12 +6,13 @@ import { ErrorInfo as ErrorInfoType } from '@/lib/errors'
 interface Props {
   children: ReactNode
   fallback?: ReactNode
+  onError?: (error: Error, errorInfo: ErrorInfo) => void
 }
 
 interface State {
   hasError: boolean
-  error?: Error
-  errorInfo?: ErrorInfo
+  error?: string
+  errorInfo?: ErrorInfoType
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -20,22 +21,26 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error }
+    return { hasError: true, error: error.toString() }
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    this.setState({ error, errorInfo })
-    console.error('Uncaught error:', error, errorInfo)
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Log the error to console
+    console.error('Error caught by boundary:', error, errorInfo)
+    
+    // Update state with error details
+    this.setState({
+      hasError: true,
+      error: error.toString(),
+      errorInfo: {
+        componentStack: errorInfo.componentStack || ''
+      }
+    })
     
     // Log to error tracking service
-    const errorData: ErrorInfoType = {
-      componentStack: errorInfo.componentStack,
-      errorBoundary: 'GlobalErrorBoundary',
-      eventType: 'react_error',
+    if (this.props.onError) {
+      this.props.onError(error, errorInfo)
     }
-    
-    // In a real application, you would send this to an error tracking service
-    console.error('Error boundary caught error:', { error, errorInfo: errorData })
   }
 
   private handleRetry = () => {
@@ -59,7 +64,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <details className="mb-4 text-sm whitespace-pre-wrap">
                 <summary className="cursor-pointer font-medium">Error details</summary>
                 <pre className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded">
-                  {this.state.error?.toString()}
+                  {this.state.error}
                   {this.state.errorInfo?.componentStack}
                 </pre>
               </details>

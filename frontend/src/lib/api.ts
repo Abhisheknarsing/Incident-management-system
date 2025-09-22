@@ -1,4 +1,4 @@
-import axios, { AxiosError, AxiosResponse } from 'axios'
+import axios, { AxiosError } from 'axios'
 import { Upload, DashboardData, TimelineData, PriorityAnalysis, ApplicationAnalysis, SentimentAnalysis, ResolutionMetrics, AutomationAnalysis } from '@/types'
 import { APIError } from '@/lib/errors'
 

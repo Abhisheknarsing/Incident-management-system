@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useNotifications } from '@/hooks/useAppState'
-import { APIError, ErrorRecovery, isRetryableError, getUserFriendlyMessage, getErrorSuggestions } from '@/lib/errors'
-import { AxiosError } from 'axios'
+import { APIError, isRetryableError, getUserFriendlyMessage } from '@/lib/errors'
 
 interface UseErrorHandlerReturn {
   handleError: (error: any, context?: string) => void
@@ -65,7 +64,6 @@ export function useErrorHandler(): UseErrorHandlerReturn {
     
     // Create user-friendly message
     const userMessage = getUserFriendlyMessage(apiError)
-    const suggestions = getErrorSuggestions(apiError)
     
     // Show notification
     addNotification({

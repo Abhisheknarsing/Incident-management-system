@@ -16,7 +16,7 @@ func (db *DB) createUploadsTable(ctx context.Context, tx *sql.Tx) error {
 			record_count INTEGER DEFAULT 0,
 			processed_count INTEGER DEFAULT 0,
 			error_count INTEGER DEFAULT 0,
-			errors TEXT[],
+			errors TEXT,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			processed_at TIMESTAMP
 		)
